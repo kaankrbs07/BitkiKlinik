@@ -33,6 +33,7 @@ export default function AdminLayout() {
       <Stack.Screen name="index" />
       <Stack.Screen name="users" />
       <Stack.Screen name="diseases" />
+      <Stack.Screen name="active-learning" />
     </Stack>
   );
 }

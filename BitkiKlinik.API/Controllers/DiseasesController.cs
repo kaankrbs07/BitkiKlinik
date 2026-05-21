@@ -17,17 +17,23 @@ public class DiseasesController : ControllerBase
     private readonly ITreatmentService _treatmentService;
     private readonly IPlantAnalysisService _plantAnalysisService;
     private readonly IScanService _scanService;
+    private readonly IActiveLearningService _activeLearningService;
+    private readonly ILogger<DiseasesController> _logger;
 
     public DiseasesController(
         IDiseaseService diseaseService,
         ITreatmentService treatmentService,
         IPlantAnalysisService plantAnalysisService,
-        IScanService scanService)
+        IScanService scanService,
+        IActiveLearningService activeLearningService,
+        ILogger<DiseasesController> logger)
     {
         _diseaseService       = diseaseService;
         _treatmentService     = treatmentService;
         _plantAnalysisService = plantAnalysisService;
         _scanService          = scanService;
+        _activeLearningService = activeLearningService;
+        _logger               = logger;
     }
 
     /// <summary>
@@ -134,6 +140,16 @@ public class DiseasesController : ControllerBase
             return NotFound(new { Message = "Bu hastalık için henüz bir tedavi önerisi eklenmemiş." });
 
         return Ok(treatments);
+    }
+
+    [HttpPost("{scanId}/flag")]
+    public async Task<IActionResult> FlagScan(int scanId, [FromBody] FlagScanDTO? dto)
+    {
+        var success = await _activeLearningService.FlagScanAsync(scanId);
+        if (!success)
+            return NotFound(new { message = "Tarama bulunamadı." });
+        _logger.LogInformation("Tarama {ScanId} kullanıcı tarafından yanlış teşhis olarak bildirildi.", scanId);
+        return Ok(new { message = "Teşhis bildirimi başarıyla kaydedildi." });
     }
 
     // ── Private Helpers ──────────────────────────────────────────────

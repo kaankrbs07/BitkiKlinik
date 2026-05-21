@@ -47,6 +47,7 @@ builder.Services.AddScoped<IProfileService, ProfileService>();
 builder.Services.AddScoped<IDashboardService, DashboardService>();
 builder.Services.AddScoped<IScanService, ScanService>();
 builder.Services.AddScoped<IAdminDiseaseService, AdminDiseaseService>();
+builder.Services.AddScoped<IActiveLearningService, ActiveLearningService>();
 
 builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
     .AddJwtBearer(options =>
@@ -92,6 +93,13 @@ builder.Services.AddOpenApi();
 
 
 var app = builder.Build();
+
+// Ensure active-learning directory exists
+var activeLearningPath = Path.Combine(Directory.GetCurrentDirectory(), "wwwroot", "uploads", "active-learning");
+if (!Directory.Exists(activeLearningPath))
+{
+    Directory.CreateDirectory(activeLearningPath);
+}
 
 // ── Veritabanı Seed ────────────────────────────────────────────────────────
 // Tablolar boşsa hastalık ve tedavi verilerini yükler (idempotent).

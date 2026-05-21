@@ -15,12 +15,16 @@ Başlatma :
 import io
 import json
 import logging
+import os
+import threading
+import uuid
+import datetime
 from contextlib import asynccontextmanager
 from pathlib import Path
 
 import torch
 from PIL import Image
-from fastapi import FastAPI, File, HTTPException, UploadFile
+from fastapi import FastAPI, File, HTTPException, UploadFile, Form
 from fastapi.responses import JSONResponse
 from torchvision import transforms
 import torchvision.transforms.functional as F
@@ -64,6 +68,12 @@ state: dict = {
     "class_map" : None,   # idx (str) → label (str)
     "device"    : None,
     "model_type": None,   # "fp32" | "int8"
+    
+    # Aktif Öğrenme Yeniden Eğitim Durumu
+    "training_status": "idle",
+    "training_progress": 0.0,
+    "training_error": None,
+    "last_trained_at": None,
 }
 
 ALLOWED_CONTENT_TYPES = {
@@ -255,3 +265,128 @@ async def health():
             "num_classes": len(state["class_map"]) if state["class_map"] else 0,
         }
     )
+
+
+@app.post("/active-learning/add-sample")
+async def add_sample(file: UploadFile = File(...), label: str = Form(...)):
+    """
+    Aktif öğrenme için yeni bir görsel örneği ekler.
+    Görsel 'data/active_learning/{label}/' klasörüne kaydedilir.
+    """
+    if state["class_map"] is None:
+        raise HTTPException(status_code=503, detail="Sınıf haritası henüz yüklenmedi.")
+
+    # Etiketin geçerli olup olmadığını kontrol edelim
+    valid_labels = list(state["class_map"].values())
+    if label not in valid_labels:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Geçersiz etiket: '{label}'. Geçerli etiketlerden biri olmalıdır."
+        )
+
+    # Görsel türü kontrolü
+    content_type = (file.content_type or "").lower()
+    if content_type not in ALLOWED_CONTENT_TYPES:
+        raise HTTPException(
+            status_code=415,
+            detail=f"Desteklenmeyen dosya türü: {content_type}."
+        )
+
+    try:
+        # Klasörü oluştur
+        label_dir = Path("data/active_learning") / label
+        label_dir.mkdir(parents=True, exist_ok=True)
+
+        # Görseli benzersiz bir isimle kaydet
+        file_extension = Path(file.filename or "image.jpg").suffix or ".jpg"
+        unique_filename = f"{uuid.uuid4()}{file_extension}"
+        file_path = label_dir / unique_filename
+
+        image_bytes = await file.read()
+        with file_path.open("wb") as f:
+            f.write(image_bytes)
+
+        logger.info(f"Aktif öğrenme örneği eklendi: label={label}, path={file_path}")
+        return JSONResponse(content={"message": "Örnek başarıyla eklendi.", "path": str(file_path)})
+
+    except Exception as exc:
+        logger.error(f"Örnek eklenirken hata: {exc}")
+        raise HTTPException(status_code=500, detail=f"Örnek eklenemedi: {exc}")
+
+
+@app.post("/active-learning/retrain")
+async def retrain():
+    """
+    Arka planda modeli aktif öğrenme verileriyle yeniden eğitmeyi tetikler.
+    """
+    if state["training_status"] == "training":
+        raise HTTPException(status_code=400, detail="Yeniden eğitim zaten devam ediyor.")
+
+    state.update(
+        training_status="training",
+        training_progress=0.0,
+        training_error=None
+    )
+
+    def run_training_thread():
+        try:
+            from retrain import retrain_model
+            
+            def progress_cb(epoch, num_epochs, t_loss, t_acc, v_loss, v_acc):
+                state["training_progress"] = float(epoch) / float(num_epochs)
+                logger.info(f"Yeniden Eğitim İlerlemesi: Epoch {epoch}/{num_epochs} - Loss: {t_loss:.4f}, Val Acc: {v_acc:.4f}")
+
+            logger.info("Aktif öğrenme yeniden eğitimi arka planda başlatılıyor...")
+            num_samples = retrain_model(progress_callback=progress_cb)
+            logger.info(f"Yeniden eğitim tamamlandı! Toplam {num_samples} örnek kullanıldı.")
+            
+            # Modeli sıcak yükleme (hot reload)
+            logger.info("Yeni ağırlıklar sıcak-yükleniyor...")
+            load_model()
+            logger.info("Model başarıyla sıcak-yüklendi!")
+
+            state.update(
+                training_status="success",
+                training_progress=1.0,
+                last_trained_at=datetime.datetime.now().isoformat()
+            )
+        except Exception as e:
+            logger.error(f"Yeniden eğitim hatası: {e}", exc_info=True)
+            state.update(
+                training_status="error",
+                training_error=str(e),
+                training_progress=0.0
+            )
+
+    # Arka plan iş parçacığını başlat
+    threading.Thread(target=run_training_thread, daemon=True).start()
+    
+    return JSONResponse(content={"message": "Yeniden eğitim arka planda başlatıldı."})
+
+
+@app.get("/active-learning/retrain-status")
+async def retrain_status():
+    """
+    Yeniden eğitim durumunu ve aktif öğrenme veri seti istatistiklerini döner.
+    """
+    samples_breakdown = {}
+    total_samples = 0
+    data_dir = Path("data/active_learning")
+
+    if data_dir.exists():
+        for label in os.listdir(data_dir):
+            label_dir = data_dir / label
+            if label_dir.is_dir():
+                count = len([f for f in os.listdir(label_dir) if f.lower().endswith(('.png', '.jpg', '.jpeg', '.webp'))])
+                if count > 0:
+                    samples_breakdown[label] = count
+                    total_samples += count
+
+    return JSONResponse(content={
+        "status": state["training_status"],
+        "progress": round(state["training_progress"], 4),
+        "error": state["training_error"],
+        "lastTrainedAt": state["last_trained_at"],
+        "totalSamples": total_samples,
+        "samplesBreakdown": samples_breakdown
+    })

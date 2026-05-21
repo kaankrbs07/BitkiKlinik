@@ -49,6 +49,15 @@ const adminMenuItems = [
     bgColor: COLORS.emeraldLight,
     route: '/(admin)/diseases',
   },
+  {
+    id: 'active-learning',
+    title: 'Aktif Öğrenme & Eğitim',
+    subtitle: 'Yapay zekayı yeni verilerle eğit ve iyileştir',
+    icon: 'bulb',
+    color: COLORS.amber,
+    bgColor: COLORS.amberLight,
+    route: '/(admin)/active-learning',
+  },
 ];
 
 export default function AdminDashboardScreen() {

@@ -15,6 +15,8 @@ public class PlantAnalysisService : IPlantAnalysisService
     private readonly IHttpClientFactory _httpClientFactory;
     private readonly IWebHostEnvironment _env;
     private readonly ILogger<PlantAnalysisService> _logger;
+    private readonly IActiveLearningService _activeLearningService;
+    private readonly IConfiguration _configuration;
 
     // ── Konfigürasyon değerleri ───────────────────────────────────────────────
     private readonly string _analyzeEndpoint;
@@ -26,11 +28,14 @@ public class PlantAnalysisService : IPlantAnalysisService
         IHttpClientFactory httpClientFactory,
         IWebHostEnvironment env,
         IConfiguration configuration,
-        ILogger<PlantAnalysisService> logger)
+        ILogger<PlantAnalysisService> logger,
+        IActiveLearningService activeLearningService)
     {
         _httpClientFactory = httpClientFactory;
         _env               = env;
         _logger            = logger;
+        _activeLearningService = activeLearningService;
+        _configuration      = configuration;
 
         // appsettings.json → PythonApi
         var pythonSection = configuration.GetSection("PythonApi");
@@ -66,12 +71,36 @@ public class PlantAnalysisService : IPlantAnalysisService
             "Analiz tamamlandı. Etiket: {Label}, Güven: {Confidence:P1}, Görsel: {Url}",
             pythonResponse.Disease, pythonResponse.Confidence, imageUrl);
 
-        return new PlantAnalysisResultDTO
+        var result = new PlantAnalysisResultDTO
         {
             ModelLabel = pythonResponse.Disease,
             Confidence = pythonResponse.Confidence,
             ImageUrl   = imageUrl
         };
+
+        // Aktif öğrenme: Düşük güven skoru kontrolü
+        var threshold = _configuration.GetValue<double>("ActiveLearning:ConfidenceThreshold", 0.65);
+        if (result.Confidence < threshold)
+        {
+            _ = Task.Run(async () =>
+            {
+                try
+                {
+                    await _activeLearningService.EnqueueAsync(
+                        scanId: null,
+                        imagePath: result.ImageUrl,
+                        predictedDisease: result.ModelLabel,
+                        confidence: result.Confidence,
+                        source: Models.Enums.ActiveLearningSource.LowConfidence);
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogError(ex, "Aktif öğrenme kuyruğuna otomatik ekleme başarısız.");
+                }
+            });
+        }
+
+        return result;
     }
 
     // ── Özel yardımcı metodlar ────────────────────────────────────────────────

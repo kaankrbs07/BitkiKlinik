@@ -13,6 +13,7 @@ public class ApplicationDbContext : DbContext
     public DbSet<Treatment> Treatments { get; set; } = null!;
     public DbSet<DiseaseTreatment> DiseaseTreatments { get; set; } = null!;
     public DbSet<PlantScan> PlantScans { get; set; } = null!;
+    public DbSet<ActiveLearningQueue> ActiveLearningQueue { get; set; } = null!;
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -24,6 +25,7 @@ public class ApplicationDbContext : DbContext
         modelBuilder.Entity<Treatment>().ToTable("Treatments");
         modelBuilder.Entity<DiseaseTreatment>().ToTable("DiseaseTreatments");
         modelBuilder.Entity<PlantScan>().ToTable("PlantScans");
+        modelBuilder.Entity<ActiveLearningQueue>().ToTable("ActiveLearningQueue");
 
         // ── Treatment: store TreatmentType enum as an integer column ─────────
         modelBuilder.Entity<Treatment>(entity =>
@@ -87,6 +89,23 @@ public class ApplicationDbContext : DbContext
 
             // Dashboard sorgusu için bileşik index (UserId + ScanDate DESC)
             entity.HasIndex(ps => new { ps.UserId, ps.ScanDate });
+        });
+
+        // ── ActiveLearningQueue configuration ───────────────────────────────
+        modelBuilder.Entity<ActiveLearningQueue>(entity =>
+        {
+            entity.HasKey(e => e.Id);
+            entity.Property(e => e.Status).HasConversion<int>();
+            entity.Property(e => e.Source).HasConversion<int>();
+            entity.Property(e => e.PredictedDisease).IsRequired().HasMaxLength(200);
+            entity.Property(e => e.CorrectedDisease).HasMaxLength(200);
+            entity.Property(e => e.ImagePath).IsRequired().HasMaxLength(500);
+            entity.HasOne(e => e.Scan)
+                  .WithMany()
+                  .HasForeignKey(e => e.ScanId)
+                  .OnDelete(DeleteBehavior.SetNull);
+            entity.HasIndex(e => e.Status);
+            entity.HasIndex(e => e.CreatedAt);
         });
     }
 }

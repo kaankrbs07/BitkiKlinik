@@ -1,9 +1,10 @@
 import React, { useState } from 'react';
-import { View, Text, StyleSheet, Image, ScrollView, TouchableOpacity, Dimensions } from 'react-native';
+import { View, Text, StyleSheet, Image, ScrollView, TouchableOpacity, Dimensions, Alert } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { CONFIG } from '../constants/config';
+import { dotnetClient } from '../api/client';
 
 // Tip tanımlamaları
 interface Treatment {
@@ -25,6 +26,7 @@ interface DiseaseData {
   };
   confidence: number;
   imageUrl: string;
+  scanId?: number;
 }
 
 const { width } = Dimensions.get('window');
@@ -33,6 +35,23 @@ export default function ResultScreen() {
   const params = useLocalSearchParams();
   const router = useRouter();
   const [activeTab, setActiveTab] = useState<'natural' | 'chemical'>('natural');
+  const [isFlagged, setIsFlagged] = useState(false);
+  const [isFlagging, setIsFlagging] = useState(false);
+
+  const handleFlagScan = async () => {
+    if (!data || !data.scanId) return;
+    setIsFlagging(true);
+    try {
+      await dotnetClient.post(`/Diseases/${data.scanId}/flag`, {});
+      setIsFlagged(true);
+      Alert.alert('Bildirildi', 'Yanlış teşhis bildirimi başarıyla yapıldı. Sistem yöneticileri bu durumu aktif öğrenme kuyruğunda inceleyecektir.');
+    } catch (e: any) {
+      console.error(e);
+      Alert.alert('Hata', 'Bildirim yapılırken bir sorun oluştu.');
+    } finally {
+      setIsFlagging(false);
+    }
+  };
 
   let data: DiseaseData | null = null;
   
@@ -92,6 +111,24 @@ export default function ResultScreen() {
             <Text style={styles.diseaseName}>{data.disease.name}</Text>
           </View>
           <Text style={styles.diseaseDescription}>{data.disease.description}</Text>
+          
+          {data.scanId && (
+            <TouchableOpacity 
+              style={[styles.flagButton, isFlagged && styles.flagButtonActive]} 
+              onPress={handleFlagScan}
+              disabled={isFlagging || isFlagged}
+            >
+              <Ionicons 
+                name={isFlagged ? "flag" : "flag-outline"} 
+                size={16} 
+                color={isFlagged ? "#777" : "#ff3b30"} 
+                style={{marginRight: 6}} 
+              />
+              <Text style={[styles.flagButtonText, isFlagged && styles.flagButtonTextActive]}>
+                {isFlagging ? "Bildiriliyor..." : isFlagged ? "Yanlış Teşhis Bildirildi" : "Yanlış Teşhis Bildir"}
+              </Text>
+            </TouchableOpacity>
+          )}
         </View>
 
         {/* Tedaviler */}
@@ -372,5 +409,29 @@ const styles = StyleSheet.create({
   backButtonText: {
     color: 'white',
     fontWeight: 'bold',
+  },
+  flagButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: 16,
+    paddingVertical: 10,
+    paddingHorizontal: 16,
+    borderRadius: 10,
+    backgroundColor: '#ffe4e6',
+    borderWidth: 1,
+    borderColor: '#ffa3a3',
+  },
+  flagButtonActive: {
+    backgroundColor: '#f1f5f9',
+    borderColor: '#cbd5e1',
+  },
+  flagButtonText: {
+    fontSize: 13,
+    fontWeight: 'bold',
+    color: '#ff3b30',
+  },
+  flagButtonTextActive: {
+    color: '#777',
   }
 });
