@@ -1,0 +1,33 @@
+# IDE / Editor folders
+.idea/
+.vscode/
+*.suo
+*.user
+*.userosscache
+*.sln.docstates
+
+# OS files
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+.DS_Store
+
+# Expo / React Native App (BitkiKlinik)
+BitkiKlinik/node_modules/
+BitkiKlinik/.expo/
+BitkiKlinik/dist/
+BitkiKlinik/web-build/
+BitkiKlinik/npm-debug.*
+BitkiKlinik/yarn-debug.*
+BitkiKlinik/yarn-error.*
+BitkiKlinik/.env*.local
+
+# .NET Backend (BitkiKlinik.API)
+BitkiKlinik.API/bin/
+BitkiKlinik.API/obj/
+
+# Python ML (BitkiKlinik.ML)
+BitkiKlinik.ML/venv/
+BitkiKlinik.ML/__pycache__/
+BitkiKlinik.ML/*.pyc
+BitkiKlinik.ML/.ipynb_checkpoints/

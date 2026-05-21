@@ -1,0 +1,19 @@
+# BitkiKlinik ML - EfficientNet-B0 Eğitim Bağımlılıkları
+# torch + torchvision: EfficientNet, TorchScript, INT8 Quantization dahil
+torch
+torchvision
+torchaudio
+
+# Veri & analiz
+kagglehub
+pandas
+numpy
+matplotlib
+scikit-learn
+pillow
+tqdm
+
+# FastAPI inference servisi
+fastapi
+uvicorn[standard]
+python-multipart
