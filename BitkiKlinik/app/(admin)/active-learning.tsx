@@ -98,6 +98,27 @@ export default function ActiveLearningScreen() {
     );
   };
 
+  // Yapay zeka teşhisini hızlıca doğru olarak onayla
+  const handleQuickCorrect = (item: ActiveLearningPendingItem) => {
+    const diseaseName = diseases.find((d) => d.modelLabel === item.predictedDisease)?.name ?? item.predictedDisease;
+    Alert.alert(
+      'Teşhisi Doğrula',
+      `Yapay zekanın "${diseaseName}" tahmini doğru olarak onaylansın mı?`,
+      [
+        { text: 'İptal', style: 'cancel' },
+        {
+          text: 'Evet, Onayla',
+          onPress: async () => {
+            const ok = await resolveItem(item.id, item.predictedDisease);
+            if (ok) {
+              Alert.alert('Başarılı', 'Teşhis başarıyla doğru olarak onaylandı.');
+            }
+          },
+        },
+      ]
+    );
+  };
+
   // Teşhisi onaylama/sınıflandırma
   const handleResolve = async (correctedDiseaseLabel: string) => {
     if (!selectedItem) return;
@@ -191,10 +212,10 @@ export default function ActiveLearningScreen() {
                   <TouchableOpacity
                     style={[
                       s.retrainBtn,
-                      isRetrainingLoading || retrainStatus.totalSamples === 0 ? s.btnDisabled : undefined,
+                      isRetrainingLoading || (!retrainStatus || retrainStatus.currentSamples === 0) ? s.btnDisabled : undefined,
                     ]}
                     onPress={handleRetrain}
-                    disabled={isRetrainingLoading || retrainStatus.totalSamples === 0}
+                    disabled={isRetrainingLoading || (!retrainStatus || retrainStatus.currentSamples === 0)}
                   >
                     {isRetrainingLoading ? (
                       <ActivityIndicator size="small" color={C.white} />
@@ -220,13 +241,19 @@ export default function ActiveLearningScreen() {
 
               {/* Model Bilgileri */}
               <View style={s.panelFooter}>
-                <View style={s.footerInfo}>
-                  <Ionicons name="images-outline" size={16} color={C.slateLight} />
-                  <Text style={s.footerInfoTxt}>Aktif Öğrenme Görseli: {retrainStatus.totalSamples}</Text>
+                <View style={{ flexDirection: 'column', gap: 6 }}>
+                  <View style={s.footerInfo}>
+                    <Ionicons name="sparkles-outline" size={15} color={C.emerald} />
+                    <Text style={s.footerInfoTxt}>Güncel Görsel (Yeni): {retrainStatus.currentSamples}</Text>
+                  </View>
+                  <View style={s.footerInfo}>
+                    <Ionicons name="images-outline" size={15} color={C.slateLight} />
+                    <Text style={s.footerInfoTxt}>Toplam Görsel (Arşiv): {retrainStatus.totalSamples}</Text>
+                  </View>
                 </View>
                 {retrainStatus.lastTrainedAt && (
-                  <View style={s.footerInfo}>
-                    <Ionicons name="time-outline" size={16} color={C.slateLight} />
+                  <View style={[s.footerInfo, { alignSelf: 'flex-end' }]}>
+                    <Ionicons name="time-outline" size={15} color={C.slateLight} />
                     <Text style={s.footerInfoTxt}>
                       Son Eğitim: {new Date(retrainStatus.lastTrainedAt).toLocaleDateString('tr-TR')}
                     </Text>
@@ -275,12 +302,15 @@ export default function ActiveLearningScreen() {
                 </View>
 
                 {/* Sağ Kısım: Butonlar */}
-                <View style={s.actionColumn}>
-                  <TouchableOpacity style={s.actionResolveBtn} onPress={() => setSelectedItem(item)}>
-                    <Ionicons name="checkmark-circle" size={22} color={C.emerald} />
+                <View style={s.actionRow}>
+                  <TouchableOpacity style={s.actionResolveBtn} onPress={() => handleQuickCorrect(item)} activeOpacity={0.7}>
+                    <Ionicons name="checkmark-done" size={18} color={C.emerald} />
                   </TouchableOpacity>
-                  <TouchableOpacity style={s.actionIgnoreBtn} onPress={() => handleIgnore(item)}>
-                    <Ionicons name="trash-outline" size={18} color={C.slateLight} />
+                  <TouchableOpacity style={s.actionEditBtn} onPress={() => setSelectedItem(item)} activeOpacity={0.7}>
+                    <Ionicons name="create-outline" size={18} color={C.primary} />
+                  </TouchableOpacity>
+                  <TouchableOpacity style={s.actionIgnoreBtn} onPress={() => handleIgnore(item)} activeOpacity={0.7}>
+                    <Ionicons name="close" size={18} color={C.slateLight} />
                   </TouchableOpacity>
                 </View>
               </View>
@@ -329,6 +359,23 @@ export default function ActiveLearningScreen() {
                       <Text style={s.predictConf}>Güven Skoru: %{Math.round(selectedItem.confidence * 100)}</Text>
                     </View>
                   </View>
+
+                  {/* Hızlı Doğrulama Kısayol Butonu */}
+                  <TouchableOpacity
+                    style={s.modalQuickCorrectBtn}
+                    onPress={async () => {
+                      const item = selectedItem;
+                      setSelectedItem(null);
+                      const ok = await resolveItem(item.id, item.predictedDisease);
+                      if (ok) {
+                        Alert.alert('Başarılı', 'Teşhis başarıyla doğru olarak onaylandı.');
+                      }
+                    }}
+                    activeOpacity={0.8}
+                  >
+                    <Ionicons name="checkmark-done" size={20} color={C.white} style={{ marginRight: 8 }} />
+                    <Text style={s.modalQuickCorrectBtnTxt}>Bu Teşhis Doğru (Doğrula & Onayla)</Text>
+                  </TouchableOpacity>
 
                   {/* Sınıf Arama Filtresi */}
                   <Text style={s.searchLabel}>Doğru Hastalık Sınıfını Seçin</Text>
@@ -540,22 +587,50 @@ const s = StyleSheet.create({
   itemDate: { fontSize: 10, color: C.slateLight },
   itemTitle: { fontSize: 14, fontWeight: 'bold', color: C.slate },
   itemSubtitle: { fontSize: 11, color: C.slateLight, marginTop: 1 },
-  actionColumn: { alignItems: 'center', gap: 10, paddingLeft: 10 },
+  actionRow: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingLeft: 6 },
   actionResolveBtn: {
-    width: 36,
-    height: 36,
-    borderRadius: 10,
+    width: 32,
+    height: 32,
+    borderRadius: 8,
     backgroundColor: C.emeraldLight,
     justifyContent: 'center',
     alignItems: 'center',
   },
+  actionEditBtn: {
+    width: 32,
+    height: 32,
+    borderRadius: 8,
+    backgroundColor: C.primaryLight,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
   actionIgnoreBtn: {
-    width: 36,
-    height: 36,
-    borderRadius: 10,
+    width: 32,
+    height: 32,
+    borderRadius: 8,
     backgroundColor: C.bg,
     justifyContent: 'center',
     alignItems: 'center',
+  },
+  modalQuickCorrectBtn: {
+    backgroundColor: C.emerald,
+    borderRadius: 12,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    marginBottom: 16,
+    shadowColor: C.emerald,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.15,
+    shadowRadius: 8,
+    elevation: 3,
+  },
+  modalQuickCorrectBtnTxt: {
+    color: C.white,
+    fontSize: 14,
+    fontWeight: '700',
   },
 
   // Empty state

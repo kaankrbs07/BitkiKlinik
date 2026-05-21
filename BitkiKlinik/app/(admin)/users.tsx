@@ -8,6 +8,7 @@ import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import Animated, { FadeInDown } from 'react-native-reanimated';
 import { useAdminUsers, AdminUser, CreateUserPayload } from '../../hooks/useAdminUsers';
+import { useAuthStore } from '../../store/useAuthStore';
 
 const COLORS = {
   primary: '#6366f1',
@@ -24,7 +25,7 @@ const COLORS = {
 
 export default function AdminUsersScreen() {
   const router = useRouter();
-  const { users, isLoading, error, refresh, createUser, deactivateUser, activateUser } = useAdminUsers();
+  const { users, isLoading, error, refresh, createUser, updateUser, deactivateUser, activateUser } = useAdminUsers();
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [form, setForm] = useState<CreateUserPayload>({ username: '', email: '', password: '', role: 'User' });
 
@@ -54,6 +55,38 @@ export default function AdminUsersScreen() {
           text: 'Evet',
           style: user.isActive ? 'destructive' : 'default',
           onPress: () => user.isActive ? deactivateUser(user.id) : activateUser(user.id),
+        },
+      ]
+    );
+  };
+
+  // ── Rol Değiştirme (Admin <-> User) ──────────────────────────────
+  const handleToggleRole = (user: AdminUser) => {
+    if (user.id === 3) {
+      Alert.alert('Uyarı', 'Ana yönetici (ID: 3) hesabının rolü güvenlik nedeniyle değiştirilemez.');
+      return;
+    }
+    const currentUserId = useAuthStore.getState().userId;
+    if (user.id.toString() === currentUserId) {
+      Alert.alert('Uyarı', 'Kendi yöneticilik rolünüzü değiştiremezsiniz.');
+      return;
+    }
+
+    const newRole = user.role === 'Admin' ? 'User' : 'Admin';
+    const roleText = newRole === 'Admin' ? 'Yönetici (Admin)' : 'Standart Kullanıcı (User)';
+    Alert.alert(
+      'Rol Değişikliği',
+      `${user.username} kullanıcısının rolünü ${roleText} olarak değiştirmek istediğinize emin misiniz?`,
+      [
+        { text: 'İptal', style: 'cancel' },
+        {
+          text: 'Rolü Değiştir',
+          onPress: async () => {
+            const success = await updateUser(user.id, { role: newRole });
+            if (success) {
+              Alert.alert('Başarılı', `${user.username} rolü ${newRole} olarak güncellendi.`);
+            }
+          },
         },
       ]
     );
@@ -99,11 +132,31 @@ export default function AdminUsersScreen() {
                   <Text style={styles.userName}>{user.username}</Text>
                   <Text style={styles.userEmail}>{user.email}</Text>
                   <View style={styles.badges}>
-                    <View style={[styles.badge, { backgroundColor: user.role === 'Admin' ? '#eef2ff' : '#f1f5f9' }]}>
-                      <Text style={[styles.badgeText, { color: user.role === 'Admin' ? COLORS.primary : COLORS.slateLight }]}>
-                        {user.role}
-                      </Text>
-                    </View>
+                    {user.id === 3 ? (
+                      <View style={[styles.badge, { backgroundColor: '#eef2ff', flexDirection: 'row', alignItems: 'center', gap: 4 }]}>
+                        <Text style={[styles.badgeText, { color: COLORS.primary }]}>
+                          {user.role}
+                        </Text>
+                        <Ionicons name="lock-closed" size={11} color={COLORS.primary} />
+                      </View>
+                    ) : user.id.toString() === useAuthStore.getState().userId ? (
+                      <View style={[styles.badge, { backgroundColor: user.role === 'Admin' ? '#eef2ff' : '#f1f5f9', flexDirection: 'row', alignItems: 'center', gap: 4 }]}>
+                        <Text style={[styles.badgeText, { color: user.role === 'Admin' ? COLORS.primary : COLORS.slateLight }]}>
+                          {user.role}
+                        </Text>
+                        <Ionicons name="person" size={11} color={user.role === 'Admin' ? COLORS.primary : COLORS.slateLight} />
+                      </View>
+                    ) : (
+                      <TouchableOpacity
+                        style={[styles.badge, { backgroundColor: user.role === 'Admin' ? '#eef2ff' : '#f1f5f9', flexDirection: 'row', alignItems: 'center', gap: 4 }]}
+                        onPress={() => handleToggleRole(user)}
+                      >
+                        <Text style={[styles.badgeText, { color: user.role === 'Admin' ? COLORS.primary : COLORS.slateLight }]}>
+                          {user.role}
+                        </Text>
+                        <Ionicons name="create-outline" size={12} color={user.role === 'Admin' ? COLORS.primary : COLORS.slateLight} />
+                      </TouchableOpacity>
+                    )}
                     <View style={[styles.badge, { backgroundColor: user.isActive ? COLORS.emeraldLight : COLORS.dangerLight }]}>
                       <Text style={[styles.badgeText, { color: user.isActive ? COLORS.emerald : COLORS.danger }]}>
                         {user.isActive ? 'Aktif' : 'Pasif'}

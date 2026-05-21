@@ -50,7 +50,8 @@
         {
           "photosPermission": "Allow Bitki Klinik to access your photos to select saved leaf images."
         }
-      ]
+      ],
+      "expo-web-browser"
     ],
     "experiments": {
       "typedRoutes": true,

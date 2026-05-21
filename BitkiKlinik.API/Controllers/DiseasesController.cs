@@ -1,4 +1,5 @@
 using System.Security.Claims;
+using BitkiKlinik.API.Configuration;
 using BitkiKlinik.API.DTOs;
 using BitkiKlinik.API.Models;
 using BitkiKlinik.API.Models.Enums;
@@ -34,6 +35,74 @@ public class DiseasesController : ControllerBase
         _scanService          = scanService;
         _activeLearningService = activeLearningService;
         _logger               = logger;
+    }
+
+    /// <summary>
+    /// Tüm hastalıkları ve bunlara ait doğal/kimyasal tedavileri listeler.
+    /// Bitki Hastalıkları Ansiklopedisi (Tıbbi Rehber) için kullanılır.
+    /// </summary>
+    [HttpGet]
+    public async Task<IActionResult> GetAllDiseases()
+    {
+        try
+        {
+            var diseases = await _diseaseService.GetAllAsync();
+            var result = new List<object>();
+
+            foreach (var disease in diseases)
+            {
+                var treatments = await _treatmentService.GetTreatmentsByDiseaseIdAsync(disease.Id);
+                result.Add(new
+                {
+                    Id = disease.Id,
+                    Name = disease.Name,
+                    Description = disease.Description,
+                    ModelLabel = disease.ModelLabel,
+                    Treatments = treatments
+                });
+            }
+
+            return Ok(result);
+        }
+        catch (Exception ex)
+        {
+            return StatusCode(500, new { Message = "Hastalıklar listelenirken bir hata oluştu.", Error = ex.Message });
+        }
+    }
+
+    /// <summary>
+    /// Hastalık adına göre hastalık ve tedavi bilgilerini döndürür.
+    /// Geçmiş taramaların detaylarını görüntülemek için kullanılır.
+    /// </summary>
+    [HttpGet("by-name/{diseaseName}")]
+    public async Task<IActionResult> GetDiseaseByName(string diseaseName)
+    {
+        try
+        {
+            var disease = (await _diseaseService.FindAsync(d => d.Name == diseaseName)).FirstOrDefault();
+
+            if (disease == null)
+                return NotFound(new { Message = "Bu isimle eşleşen bir hastalık bulunamadı." });
+
+            var treatments = await _treatmentService.GetTreatmentsByDiseaseIdAsync(disease.Id);
+
+            return Ok(new
+            {
+                Disease = new DiseaseDTO
+                {
+                    Id          = disease.Id,
+                    Name        = disease.Name,
+                    Description = disease.Description
+                },
+                Treatments = treatments,
+                Confidence = 1.0, // Varsayılan güven skoru
+                ImageUrl = (string?)null // Görsel geçmiş kaydından alınacak
+            });
+        }
+        catch (Exception ex)
+        {
+            return StatusCode(500, new { Message = "Hastalık bilgisi aranırken bir hata oluştu.", Error = ex.Message });
+        }
     }
 
     /// <summary>
@@ -84,6 +153,25 @@ public class DiseasesController : ControllerBase
                 ScanDate    = DateTime.UtcNow
             };
             await _scanService.SaveScanAsync(plantScan);
+
+            // 4.5 Düşük güven durumunda aktif öğrenme kuyruğuna otomatik ekle
+            if (analysisResult.Confidence < GlobalConstants.ActiveLearningThreshold)
+            {
+                try
+                {
+                    await _activeLearningService.EnqueueAsync(
+                        scanId: plantScan.Id,
+                        imagePath: plantScan.ImageUrl ?? string.Empty,
+                        predictedDisease: plantScan.DiseaseName,
+                        confidence: plantScan.Confidence,
+                        source: Models.Enums.ActiveLearningSource.LowConfidence
+                    );
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogError(ex, "Düşük güvenli tarama aktif öğrenme kuyruğuna eklenirken hata oluştu. ScanId: {ScanId}", plantScan.Id);
+                }
+            }
 
             // 5. Birleşik sonucu döndür
             return Ok(new

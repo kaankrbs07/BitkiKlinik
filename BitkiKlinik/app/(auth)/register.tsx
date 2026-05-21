@@ -3,6 +3,7 @@ import { View, Text, TextInput, TouchableOpacity, StyleSheet, KeyboardAvoidingVi
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { dotnetClient } from '../../api/client';
+import { useAuthStore } from '../../store/useAuthStore';
 
 export default function RegisterScreen() {
   const router = useRouter();
@@ -20,13 +21,24 @@ export default function RegisterScreen() {
 
     setIsLoading(true);
     try {
-      await dotnetClient.post('/Auth/register', { username, email, password });
+      const response = await dotnetClient.post('/Auth/register', { username, email, password });
       
-      // Kayıt başarılı olduğunda verify ekranına yönlendir
+      const token = response.data?.token || response.data?.Token;
+      
+      // Kayıt başarılı olduğunda otomatik giriş yapılmasını ve yönlendirmeyi sağla
       Alert.alert(
         'Kayıt Başarılı', 
-        'Hesabınız oluşturuldu. Lütfen size gönderilen doğrulama kodunu girin.',
-        [{ text: 'Tamam', onPress: () => router.push({ pathname: '/(auth)/verify', params: { email } }) }]
+        'Hesabınız başarıyla oluşturuldu ve doğrulama kodunuz e-posta adresinize gönderildi.',
+        [{ 
+          text: 'Tamam', 
+          onPress: () => {
+            if (token) {
+              useAuthStore.getState().login(token);
+            } else {
+              router.replace({ pathname: '/(auth)/verify', params: { email } });
+            }
+          } 
+        }]
       );
     } catch (error: any) {
       console.error(error);

@@ -45,6 +45,41 @@ OUTPUT_DIR      = Path("outputs")
 MODEL_FP32_PATH = OUTPUT_DIR / "efficientnet_b0_plant.pt"         # TorchScript FP32
 MODEL_INT8_PATH = OUTPUT_DIR / "efficientnet_b0_plant.quant.pt"   # INT8 (CPU)
 CLASS_MAP_PATH  = OUTPUT_DIR / "class_map.json"
+META_PATH       = OUTPUT_DIR / "active_learning_meta.json"
+
+# ─────────────────────────────────────────────
+#  ACTIVE LEARNING METADATA HELPERS
+# ─────────────────────────────────────────────
+def load_active_learning_meta() -> list[str]:
+    """
+    Eğitilmiş aktif öğrenme dosyalarının listesini ve son eğitim zamanını dosyadan yükler.
+    """
+    if META_PATH.exists():
+        try:
+            with META_PATH.open("r", encoding="utf-8") as f:
+                data = json.load(f)
+                state["last_trained_at"] = data.get("last_trained_at")
+                state["trained_files"] = data.get("trained_files", [])
+                return state["trained_files"]
+        except Exception as e:
+            logger.error(f"Metadata yükleme hatası: {e}")
+    state["trained_files"] = []
+    return []
+
+def save_active_learning_meta(trained_files: list[str]) -> None:
+    """
+    Eğitilmiş dosyaların listesini ve son eğitim zamanını dosyaya kaydeder.
+    """
+    try:
+        OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
+        data = {
+            "last_trained_at": state["last_trained_at"],
+            "trained_files": trained_files
+        }
+        with META_PATH.open("w", encoding="utf-8") as f:
+            json.dump(data, f, ensure_ascii=False, indent=2)
+    except Exception as e:
+        logger.error(f"Metadata kaydetme hatası: {e}")
 
 # ─────────────────────────────────────────────
 #  PREPROCESSING — train.py val_tf ile aynı
@@ -74,6 +109,7 @@ state: dict = {
     "training_progress": 0.0,
     "training_error": None,
     "last_trained_at": None,
+    "trained_files": [],
 }
 
 ALLOWED_CONTENT_TYPES = {
@@ -188,6 +224,7 @@ async def lifespan(app: FastAPI):
     """FastAPI lifespan: startup → modeli yükle, shutdown → temizle."""
     logger.info("BitkiKlinik AI servisi başlatılıyor...")
     load_model()
+    load_active_learning_meta()
     logger.info("Servis hazır. Endpoint: POST /analyze")
     yield
     # Shutdown
@@ -345,10 +382,26 @@ async def retrain():
             load_model()
             logger.info("Model başarıyla sıcak-yüklendi!")
 
+            # Bütün mevcut aktif öğrenme dosyalarını trained_files olarak kaydet
+            all_files = []
+            data_dir = Path("data/active_learning")
+            if data_dir.exists():
+                for label in os.listdir(data_dir):
+                    label_dir = data_dir / label
+                    if label_dir.is_dir():
+                        for f in os.listdir(label_dir):
+                            if f.lower().endswith(('.png', '.jpg', '.jpeg', '.webp')):
+                                rel_path = (label_dir / f).as_posix()
+                                all_files.append(rel_path)
+
+            state["trained_files"] = all_files
+            state["last_trained_at"] = datetime.datetime.now().isoformat()
+            save_active_learning_meta(all_files)
+
             state.update(
                 training_status="success",
                 training_progress=1.0,
-                last_trained_at=datetime.datetime.now().isoformat()
+                last_trained_at=state["last_trained_at"]
             )
         except Exception as e:
             logger.error(f"Yeniden eğitim hatası: {e}", exc_info=True)
@@ -371,16 +424,23 @@ async def retrain_status():
     """
     samples_breakdown = {}
     total_samples = 0
+    current_samples = 0
     data_dir = Path("data/active_learning")
+    trained_files = set(state.get("trained_files", []))
 
     if data_dir.exists():
         for label in os.listdir(data_dir):
             label_dir = data_dir / label
             if label_dir.is_dir():
-                count = len([f for f in os.listdir(label_dir) if f.lower().endswith(('.png', '.jpg', '.jpeg', '.webp'))])
+                files = [f for f in os.listdir(label_dir) if f.lower().endswith(('.png', '.jpg', '.jpeg', '.webp'))]
+                count = len(files)
                 if count > 0:
                     samples_breakdown[label] = count
                     total_samples += count
+                    for f in files:
+                        rel_path = (label_dir / f).as_posix()
+                        if rel_path not in trained_files:
+                            current_samples += 1
 
     return JSONResponse(content={
         "status": state["training_status"],
@@ -388,5 +448,6 @@ async def retrain_status():
         "error": state["training_error"],
         "lastTrainedAt": state["last_trained_at"],
         "totalSamples": total_samples,
+        "currentSamples": current_samples,
         "samplesBreakdown": samples_breakdown
     })

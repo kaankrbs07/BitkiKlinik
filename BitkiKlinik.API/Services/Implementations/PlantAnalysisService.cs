@@ -78,28 +78,6 @@ public class PlantAnalysisService : IPlantAnalysisService
             ImageUrl   = imageUrl
         };
 
-        // Aktif öğrenme: Düşük güven skoru kontrolü
-        var threshold = _configuration.GetValue<double>("ActiveLearning:ConfidenceThreshold", 0.65);
-        if (result.Confidence < threshold)
-        {
-            _ = Task.Run(async () =>
-            {
-                try
-                {
-                    await _activeLearningService.EnqueueAsync(
-                        scanId: null,
-                        imagePath: result.ImageUrl,
-                        predictedDisease: result.ModelLabel,
-                        confidence: result.Confidence,
-                        source: Models.Enums.ActiveLearningSource.LowConfidence);
-                }
-                catch (Exception ex)
-                {
-                    _logger.LogError(ex, "Aktif öğrenme kuyruğuna otomatik ekleme başarısız.");
-                }
-            });
-        }
-
         return result;
     }
 

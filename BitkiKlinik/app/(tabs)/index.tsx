@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { 
   View, 
   Text, 
@@ -9,7 +9,8 @@ import {
   ActivityIndicator, 
   Platform,
   StatusBar,
-  RefreshControl
+  RefreshControl,
+  Image
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
@@ -17,12 +18,12 @@ import { Ionicons } from '@expo/vector-icons';
 import Animated, { 
   FadeInDown, 
   FadeInRight, 
-  useSharedValue, 
-  useAnimatedStyle, 
-  withSpring 
 } from 'react-native-reanimated';
+
 import { useAuthStore } from '../../store/useAuthStore';
 import { useDashboardData, RecentScan } from '../../hooks/useDashboardData';
+import { useProfile } from '../../hooks/useProfile';
+import { CONFIG } from '../../constants/config';
 
 const { width } = Dimensions.get('window');
 
@@ -61,12 +62,273 @@ function formatDate(isoDate: string): string {
   }
 }
 
+// ============================================================================
+// 1. HEADER SECTION COMPONENT
+// ============================================================================
+interface HeaderSectionProps {
+  username: string | null;
+  profilePictureUrl: string | null;
+  onAvatarPress: () => void;
+  onLogoutPress: () => void;
+}
+
+function HeaderSection({ username, profilePictureUrl, onAvatarPress, onLogoutPress }: HeaderSectionProps) {
+  const hasPhoto = !!profilePictureUrl;
+  const avatarUri = profilePictureUrl
+    ? (profilePictureUrl.startsWith('http') ? profilePictureUrl : `${CONFIG.DOTNET_BASE_URL}${profilePictureUrl}`)
+    : null;
+
+  const getInitials = () => {
+    if (!username) return 'BD';
+    // Sadece ilk iki harf
+    return username.substring(0, 2).toUpperCase();
+  };
+
+  return (
+    <Animated.View entering={FadeInDown.duration(800)} style={styles.header}>
+      <View>
+        <Text style={styles.greeting}>Hoş Geldin,</Text>
+        <Text style={styles.username}>{username ?? 'Bitki Dostu'} 👋</Text>
+      </View>
+      <View style={styles.profileBadge}>
+        <TouchableOpacity onPress={onAvatarPress} activeOpacity={0.7}>
+          {hasPhoto && avatarUri ? (
+            <Image source={{ uri: avatarUri }} style={styles.avatarImage} />
+          ) : (
+            <View style={styles.avatarPlaceholder}>
+              <Text style={styles.avatarPlaceholderText}>{getInitials()}</Text>
+            </View>
+          )}
+        </TouchableOpacity>
+        <TouchableOpacity onPress={onLogoutPress} style={{ marginLeft: 8, padding: 4 }} activeOpacity={0.7}>
+          <Ionicons name="log-out-outline" size={20} color={COLORS.danger} />
+        </TouchableOpacity>
+      </View>
+    </Animated.View>
+  );
+}
+
+// ============================================================================
+// 2. ADMIN BANNER SECTION COMPONENT
+// ============================================================================
+interface AdminBannerSectionProps {
+  isAdmin: boolean;
+  onPress: () => void;
+}
+
+function AdminBannerSection({ isAdmin, onPress }: AdminBannerSectionProps) {
+  if (!isAdmin) return null;
+
+  return (
+    <Animated.View entering={FadeInDown.delay(100).duration(600)}>
+      <TouchableOpacity
+        style={styles.adminBanner}
+        activeOpacity={0.85}
+        onPress={onPress}
+      >
+        <Ionicons name="shield-checkmark" size={20} color="#fff" />
+        <Text style={styles.adminBannerText}>Admin Paneli</Text>
+        <Ionicons name="chevron-forward" size={18} color="rgba(255,255,255,0.7)" />
+      </TouchableOpacity>
+    </Animated.View>
+  );
+}
+
+// ============================================================================
+// 3. STATS SECTION COMPONENT
+// ============================================================================
+interface StatsSectionProps {
+  stats: {
+    total: number;
+    healthy: number;
+    risky: number;
+  };
+}
+
+function StatsSection({ stats }: StatsSectionProps) {
+  return (
+    <Animated.View entering={FadeInDown.delay(200).duration(800)} style={styles.statsContainer}>
+      <View style={styles.statCard}>
+        <Text style={styles.statValue}>{stats.total}</Text>
+        <Text style={styles.statLabel}>Toplam</Text>
+      </View>
+      <View style={[styles.statCard, { backgroundColor: COLORS.white }]}>
+        <Text style={[styles.statValue, { color: COLORS.emerald }]}>{stats.healthy}</Text>
+        <Text style={styles.statLabel}>Sağlıklı</Text>
+      </View>
+      <View style={[styles.statCard, { backgroundColor: COLORS.white }]}>
+        <Text style={[styles.statValue, { color: COLORS.warning }]}>{stats.risky}</Text>
+        <Text style={styles.statLabel}>Riskli</Text>
+      </View>
+    </Animated.View>
+  );
+}
+
+// ============================================================================
+// 4. MAIN ACTION SECTION COMPONENT
+// ============================================================================
+interface MainActionSectionProps {
+  onPress: () => void;
+}
+
+function MainActionSection({ onPress }: MainActionSectionProps) {
+  return (
+    <Animated.View entering={FadeInDown.delay(400).duration(800)}>
+      <TouchableOpacity 
+        style={styles.mainActionCard}
+        activeOpacity={0.9}
+        onPress={onPress}
+      >
+        <View style={styles.actionContent}>
+          <View style={styles.actionIconContainer}>
+            <Ionicons name="scan-outline" size={32} color={COLORS.white} />
+          </View>
+          <View style={styles.actionTextContainer}>
+            <Text style={styles.actionTitle}>AI Sağlık Taraması</Text>
+            <Text style={styles.actionSubtitle}>Hastalıkları anında tespit et</Text>
+          </View>
+          <Ionicons name="chevron-forward" size={24} color="rgba(255,255,255,0.6)" />
+        </View>
+        <View style={styles.actionBackgroundLeaf}>
+          <Ionicons name="leaf" size={120} color="rgba(255,255,255,0.08)" />
+        </View>
+      </TouchableOpacity>
+    </Animated.View>
+  );
+}
+
+// ============================================================================
+// 5. TIPS SECTION COMPONENT
+// ============================================================================
+function TipsSection() {
+  return (
+    <View>
+      <View style={styles.sectionHeader}>
+        <Text style={styles.sectionTitle}>Bakım İpuçları</Text>
+      </View>
+      <ScrollView 
+        horizontal 
+        showsHorizontalScrollIndicator={false}
+        contentContainerStyle={styles.tipsList}
+      >
+        {careTips.map((tip, index) => (
+          <Animated.View 
+            key={tip.id} 
+            entering={FadeInRight.delay(500 + index * 100).duration(800)}
+          >
+            <TouchableOpacity style={styles.tipCard} activeOpacity={0.85}>
+              <View style={[styles.tipIconBox, { backgroundColor: tip.color + '20' }]}>
+                <Ionicons name={tip.icon as any} size={20} color={tip.color} />
+              </View>
+              <Text style={styles.tipTitle}>{tip.title}</Text>
+              <Text style={styles.tipText}>{tip.text}</Text>
+            </TouchableOpacity>
+          </Animated.View>
+        ))}
+      </ScrollView>
+    </View>
+  );
+}
+
+// ============================================================================
+// 6. HISTORY SECTION COMPONENT
+// ============================================================================
+interface HistorySectionProps {
+  recentScans: RecentScan[];
+  isLoading: boolean;
+  error: string | null;
+  onRefresh: () => void;
+  onSeeAllPress: () => void;
+}
+
+function HistorySection({ recentScans, isLoading, error, onRefresh, onSeeAllPress }: HistorySectionProps) {
+  return (
+    <View>
+      <View style={styles.sectionHeader}>
+        <Text style={styles.sectionTitle}>Son Teşhisler</Text>
+        <TouchableOpacity onPress={onSeeAllPress} activeOpacity={0.7}>
+          <Text style={styles.seeMore}>Tümünü Gör</Text>
+        </TouchableOpacity>
+      </View>
+
+      <View style={styles.historyContainer}>
+        {/* Hata durumu */}
+        {error && !isLoading && (
+          <Animated.View entering={FadeInDown.duration(400)} style={styles.errorState}>
+            <Ionicons name="cloud-offline-outline" size={36} color={COLORS.danger} />
+            <Text style={styles.errorText}>{error}</Text>
+            <TouchableOpacity style={styles.retryButton} onPress={onRefresh} activeOpacity={0.8}>
+              <Text style={styles.retryText}>Tekrar Dene</Text>
+            </TouchableOpacity>
+          </Animated.View>
+        )}
+
+        {/* Yükleniyor durumu */}
+        {isLoading && recentScans.length === 0 && (
+          <ActivityIndicator color={COLORS.emerald} style={{ marginTop: 20 }} />
+        )}
+
+        {/* Gerçek veriler */}
+        {!isLoading && !error && recentScans.length > 0 && (
+          recentScans.map((item: RecentScan, index: number) => (
+            <Animated.View 
+              key={item.id} 
+              entering={FadeInDown.delay(700 + index * 100).duration(800)}
+              style={styles.historyCard}
+            >
+              <View style={[
+                styles.historyIcon, 
+                { backgroundColor: item.isHealthy ? COLORS.emeraldLight : COLORS.dangerLight }
+              ]}>
+                <Ionicons 
+                  name={item.isHealthy ? "checkmark-circle" : "alert-circle"} 
+                  size={24} 
+                  color={item.isHealthy ? COLORS.emerald : COLORS.danger} 
+                />
+              </View>
+              <View style={styles.historyDetails}>
+                <Text style={styles.historyName}>{item.diseaseName}</Text>
+                <Text style={styles.historyDate}>{formatDate(item.scanDate)}</Text>
+              </View>
+              <View style={styles.historyStatusBadge}>
+                <Text style={[
+                  styles.statusText, 
+                  { color: item.isHealthy ? COLORS.emerald : COLORS.danger }
+                ]}>
+                  {item.isHealthy ? 'Sağlıklı' : 'Riskli'}
+                </Text>
+              </View>
+            </Animated.View>
+          ))
+        )}
+
+        {/* Boş durum */}
+        {!isLoading && !error && recentScans.length === 0 && (
+          <View style={styles.emptyState}>
+            <Ionicons name="leaf-outline" size={48} color={COLORS.slateLight} />
+            <Text style={styles.emptyText}>Henüz bir tarama kaydınız bulunmuyor.</Text>
+          </View>
+        )}
+      </View>
+    </View>
+  );
+}
+
+// ============================================================================
+// MAIN HOMESCREEN COMPONENT
+// ============================================================================
 export default function HomeScreen() {
   const router = useRouter();
-  const { logout, isAdmin, username } = useAuthStore();
-
-  // ── Gerçek veriler hook'tan geliyor ────────────────────────────
+  const { logout, isAdmin, username, profilePictureUrl, isAuthenticated } = useAuthStore();
   const { stats, recentScans, isLoading, error, refresh } = useDashboardData();
+  const { fetchProfile } = useProfile();
+
+  // Profil resmini ilk açılışta çekmek ve global store ile senkronize etmek için trigger
+  useEffect(() => {
+    if (isAuthenticated) {
+      fetchProfile();
+    }
+  }, [isAuthenticated, fetchProfile]);
 
   const handleLogout = () => {
     logout();
@@ -89,166 +351,42 @@ export default function HomeScreen() {
             />
           }
         >
-          {/* Header Section */}
-          <Animated.View entering={FadeInDown.duration(800)} style={styles.header}>
-            <View>
-              <Text style={styles.greeting}>Hoş Geldin,</Text>
-              <Text style={styles.username}>{username ?? 'Bitki Dostu'} 👋</Text>
-            </View>
-            <TouchableOpacity style={styles.profileBadge} onPress={handleLogout}>
-              <View style={styles.avatar}>
-                <Ionicons name="person" size={20} color={COLORS.slate} />
-              </View>
-              <Ionicons name="log-out-outline" size={18} color={COLORS.danger} style={{marginLeft: 8}} />
-            </TouchableOpacity>
-          </Animated.View>
+          {/* 1. Modüler Header */}
+          <HeaderSection 
+            username={username}
+            profilePictureUrl={profilePictureUrl}
+            onAvatarPress={() => router.push('/profile')}
+            onLogoutPress={handleLogout}
+          />
 
-          {/* Admin Panel Erişimi — sadece admin kullanıcılara görünür */}
-          {isAdmin && (
-            <Animated.View entering={FadeInDown.delay(100).duration(600)}>
-              <TouchableOpacity
-                style={styles.adminBanner}
-                activeOpacity={0.85}
-                onPress={() => router.push('/(admin)' as any)}
-              >
-                <Ionicons name="shield-checkmark" size={20} color="#fff" />
-                <Text style={styles.adminBannerText}>Admin Paneli</Text>
-                <Ionicons name="chevron-forward" size={18} color="rgba(255,255,255,0.7)" />
-              </TouchableOpacity>
-            </Animated.View>
-          )}
+          {/* 2. Modüler Admin Banner */}
+          <AdminBannerSection 
+            isAdmin={isAdmin}
+            onPress={() => router.push('/(admin)' as any)}
+          />
 
-          {/* Stats Section — Gerçek veriler */}
-          <Animated.View entering={FadeInDown.delay(200).duration(800)} style={styles.statsContainer}>
-            <View style={styles.statCard}>
-              <Text style={styles.statValue}>{stats.total}</Text>
-              <Text style={styles.statLabel}>Toplam</Text>
-            </View>
-            <View style={[styles.statCard, { backgroundColor: COLORS.white }]}>
-              <Text style={[styles.statValue, { color: COLORS.emerald }]}>{stats.healthy}</Text>
-              <Text style={styles.statLabel}>Sağlıklı</Text>
-            </View>
-            <View style={[styles.statCard, { backgroundColor: COLORS.white }]}>
-              <Text style={[styles.statValue, { color: COLORS.warning }]}>{stats.risky}</Text>
-              <Text style={styles.statLabel}>Riskli</Text>
-            </View>
-          </Animated.View>
+          {/* 3. Modüler Stats */}
+          <StatsSection 
+            stats={stats}
+          />
 
-          {/* Main Action Card */}
-          <Animated.View entering={FadeInDown.delay(400).duration(800)}>
-            <TouchableOpacity 
-              style={styles.mainActionCard}
-              activeOpacity={0.9}
-              onPress={() => router.push('/(tabs)/scan')}
-            >
-              <View style={styles.actionContent}>
-                <View style={styles.actionIconContainer}>
-                  <Ionicons name="scan-outline" size={32} color={COLORS.white} />
-                </View>
-                <View style={styles.actionTextContainer}>
-                  <Text style={styles.actionTitle}>AI Sağlık Taraması</Text>
-                  <Text style={styles.actionSubtitle}>Hastalıkları anında tespit et</Text>
-                </View>
-                <Ionicons name="chevron-forward" size={24} color="rgba(255,255,255,0.6)" />
-              </View>
-              <View style={styles.actionBackgroundLeaf}>
-                <Ionicons name="leaf" size={120} color="rgba(255,255,255,0.08)" />
-              </View>
-            </TouchableOpacity>
-          </Animated.View>
+          {/* 4. Modüler AI Sağlık Taraması Kartı */}
+          <MainActionSection 
+            onPress={() => router.push('/(tabs)/scan')}
+          />
 
-          {/* Quick Tips Section */}
-          <View style={styles.sectionHeader}>
-            <Text style={styles.sectionTitle}>Bakım İpuçları</Text>
-          </View>
-          <ScrollView 
-            horizontal 
-            showsHorizontalScrollIndicator={false}
-            contentContainerStyle={styles.tipsList}
-          >
-            {careTips.map((tip, index) => (
-              <Animated.View 
-                key={tip.id} 
-                entering={FadeInRight.delay(500 + index * 100).duration(800)}
-              >
-                <TouchableOpacity style={styles.tipCard}>
-                  <View style={[styles.tipIconBox, { backgroundColor: tip.color + '20' }]}>
-                    <Ionicons name={tip.icon as any} size={20} color={tip.color} />
-                  </View>
-                  <Text style={styles.tipTitle}>{tip.title}</Text>
-                  <Text style={styles.tipText}>{tip.text}</Text>
-                </TouchableOpacity>
-              </Animated.View>
-            ))}
-          </ScrollView>
+          {/* 5. Modüler İpuçları Listesi */}
+          <TipsSection />
 
-          {/* Recent History Section — Gerçek veriler */}
-          <View style={styles.sectionHeader}>
-            <Text style={styles.sectionTitle}>Son Teşhisler</Text>
-            <TouchableOpacity onPress={() => router.push('/(tabs)/explore')}>
-              <Text style={styles.seeMore}>Tümünü Gör</Text>
-            </TouchableOpacity>
-          </View>
+          {/* 6. Modüler Son Teşhisler Geçmişi */}
+          <HistorySection 
+            recentScans={recentScans}
+            isLoading={isLoading}
+            error={error}
+            onRefresh={refresh}
+            onSeeAllPress={() => router.push({ pathname: '/(tabs)/explore', params: { tab: 'history' } })}
+          />
 
-          <View style={styles.historyContainer}>
-            {/* Hata durumu */}
-            {error && !isLoading && (
-              <Animated.View entering={FadeInDown.duration(400)} style={styles.errorState}>
-                <Ionicons name="cloud-offline-outline" size={36} color={COLORS.danger} />
-                <Text style={styles.errorText}>{error}</Text>
-                <TouchableOpacity style={styles.retryButton} onPress={refresh}>
-                  <Text style={styles.retryText}>Tekrar Dene</Text>
-                </TouchableOpacity>
-              </Animated.View>
-            )}
-
-            {/* Yükleniyor durumu */}
-            {isLoading && recentScans.length === 0 && (
-              <ActivityIndicator color={COLORS.emerald} style={{ marginTop: 20 }} />
-            )}
-
-            {/* Gerçek veriler */}
-            {!isLoading && !error && recentScans.length > 0 && (
-              recentScans.map((item: RecentScan, index: number) => (
-                <Animated.View 
-                  key={item.id} 
-                  entering={FadeInDown.delay(700 + index * 100).duration(800)}
-                  style={styles.historyCard}
-                >
-                  <View style={[
-                    styles.historyIcon, 
-                    { backgroundColor: item.isHealthy ? COLORS.emeraldLight : COLORS.dangerLight }
-                  ]}>
-                    <Ionicons 
-                      name={item.isHealthy ? "checkmark-circle" : "alert-circle"} 
-                      size={24} 
-                      color={item.isHealthy ? COLORS.emerald : COLORS.danger} 
-                    />
-                  </View>
-                  <View style={styles.historyDetails}>
-                    <Text style={styles.historyName}>{item.diseaseName}</Text>
-                    <Text style={styles.historyDate}>{formatDate(item.scanDate)}</Text>
-                  </View>
-                  <View style={styles.historyStatusBadge}>
-                    <Text style={[
-                      styles.statusText, 
-                      { color: item.isHealthy ? COLORS.emerald : COLORS.danger }
-                    ]}>
-                      {item.isHealthy ? 'Sağlıklı' : 'Riskli'}
-                    </Text>
-                  </View>
-                </Animated.View>
-              ))
-            )}
-
-            {/* Boş durum */}
-            {!isLoading && !error && recentScans.length === 0 && (
-              <View style={styles.emptyState}>
-                <Ionicons name="leaf-outline" size={48} color={COLORS.slateLight} />
-                <Text style={styles.emptyText}>Henüz bir tarama kaydınız bulunmuyor.</Text>
-              </View>
-            )}
-          </View>
         </ScrollView>
       </SafeAreaView>
     </View>
@@ -294,13 +432,25 @@ const styles = StyleSheet.create({
     shadowRadius: 5,
     elevation: 2,
   },
-  avatar: {
+  avatarImage: {
     width: 36,
     height: 36,
     borderRadius: 18,
-    backgroundColor: COLORS.background,
+    borderWidth: 1.5,
+    borderColor: COLORS.emerald,
+  },
+  avatarPlaceholder: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: COLORS.emerald,
     justifyContent: 'center',
     alignItems: 'center',
+  },
+  avatarPlaceholderText: {
+    color: COLORS.white,
+    fontSize: 12,
+    fontWeight: '700',
   },
   statsContainer: {
     flexDirection: 'row',
@@ -490,7 +640,6 @@ const styles = StyleSheet.create({
     fontSize: 14,
     textAlign: 'center',
   },
-  // ── Error state stili ──────────────────────────────────────────
   errorState: {
     alignItems: 'center',
     justifyContent: 'center',
@@ -515,7 +664,6 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     fontSize: 14,
   },
-  // ── Admin Banner ───────────────────────────────────────────────
   adminBanner: {
     flexDirection: 'row',
     alignItems: 'center',

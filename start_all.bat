@@ -5,7 +5,7 @@ echo ======================================================
 
 :: 1. Python AI Servisi (Port: 8000)
 echo [1/3] Python AI Servisi baslatiliyor...
-start "AI_Service_FastAPI" cmd /k "cd /d "%~dp0BitkiKlinik.ML" && venv\Scripts\activate && python -m uvicorn serve:app --host 127.0.0.1 --port 8000"
+start "AI_Service_FastAPI" cmd /k "cd /d "%~dp0BitkiKlinik.ML" && venv\Scripts\activate && python -m uvicorn serve:app --host 0.0.0.0 --port 8000"
 
 :: 2. .NET Backend API (Port: 5135)
 echo [2/3] .NET Backend API baslatiliyor...

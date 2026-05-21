@@ -135,6 +135,33 @@ public class ActiveLearningService : IActiveLearningService
         item.CorrectedDisease = correctedDisease;
         item.ReviewedAt = DateTime.UtcNow;
 
+        // Orijinal tarama kaydını da güncelle (böylece kullanıcının geçmişinde düzelir)
+        if (item.ScanId.HasValue)
+        {
+            try
+            {
+                var scan = await _context.PlantScans.FindAsync(item.ScanId.Value);
+                if (scan != null)
+                {
+                    // Model etiketini (correctedDisease) veritabanında ara ve insan dostu ismi al
+                    var disease = await _context.Diseases.FirstOrDefaultAsync(d => d.ModelLabel == correctedDisease);
+                    var diseaseName = disease != null ? disease.Name : correctedDisease;
+
+                    scan.DiseaseName = diseaseName;
+                    var isHealthy = diseaseName.Contains("Sağlıklı", StringComparison.OrdinalIgnoreCase)
+                                 || diseaseName.Contains("Healthy", StringComparison.OrdinalIgnoreCase)
+                                 || correctedDisease.Contains("Sağlıklı", StringComparison.OrdinalIgnoreCase)
+                                 || correctedDisease.Contains("Healthy", StringComparison.OrdinalIgnoreCase);
+                    scan.Status = isHealthy ? ScanStatus.Healthy : ScanStatus.Risky;
+                    _logger.LogInformation("Orijinal tarama kaydı admin kararıyla güncellendi. ScanId: {ScanId}, Yeni Teşhis: {DiseaseName}", item.ScanId.Value, diseaseName);
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Orijinal tarama kaydı güncellenirken hata oluştu. ScanId: {ScanId}", item.ScanId.Value);
+            }
+        }
+
         await _context.SaveChangesAsync();
 
         // Python FastAPI ML servisine yeni örneği gönder

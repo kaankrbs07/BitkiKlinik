@@ -27,6 +27,10 @@ dotnetClient.interceptors.response.use(
   (response) => response,
   (error) => {
     // Error handling (Token expire olduysa logout vb)
+    if (error.response?.status === 401) {
+      console.warn("[dotnetClient] 401 Unauthorized tespit edildi. Çıkış yapılıyor...");
+      useAuthStore.getState().logout();
+    }
     return Promise.reject(error);
   }
 );

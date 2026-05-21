@@ -160,6 +160,19 @@ public class UsersController : ControllerBase
                 if (!Enum.TryParse<UserRole>(dto.Role, ignoreCase: true, out var role))
                     return BadRequest(new { Message = $"Geçersiz rol: '{dto.Role}'. Geçerli değerler: User, Admin." });
 
+                // Ana Admin Hesabı (ID = 3) Koruma Mantığı
+                if (id == 3 && role != user.Role)
+                {
+                    return BadRequest(new { Message = "Sistem bütünlüğü için ana yönetici (ID: 3) hesabının rolü değiştirilemez." });
+                }
+
+                // Kendi rolünü demote etmeyi (User yapmayı) engelle
+                var currentUserId = User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value;
+                if (currentUserId == id.ToString() && role == UserRole.User && user.Role == UserRole.Admin)
+                {
+                    return BadRequest(new { Message = "Kendi yöneticilik (Admin) rolünüzü standart kullanıcıya (User) düşüremezsiniz." });
+                }
+
                 user.Role = role;
             }
 

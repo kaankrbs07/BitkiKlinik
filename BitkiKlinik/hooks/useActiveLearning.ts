@@ -26,6 +26,7 @@ export interface RetrainStatus {
   error: string | null;
   lastTrainedAt: string | null;
   totalSamples: number;
+  currentSamples: number;
   samplesBreakdown: Record<string, number>;
 }
 
@@ -56,7 +57,7 @@ export function useActiveLearning(): UseActiveLearningReturn {
   const [isRetrainingLoading, setIsRetrainingLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   
-  const pollingTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const pollingTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const isAuthenticated = useAuthStore((state) => state.isAuthenticated);
 
   const BASE_DOTNET = '/admin/active-learning';

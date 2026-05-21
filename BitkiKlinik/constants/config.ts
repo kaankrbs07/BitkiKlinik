@@ -10,4 +10,7 @@ export const CONFIG = {
   
   // FastAPI Model Servisi
   FAST_API_URL: `http://${LOCAL_IP}:8000`,
+  
+  // Aktif öğrenme mekanizması için kabul edilen güven eşik değeri (0.65)
+  ACTIVE_LEARNING_THRESHOLD: 0.65,
 };

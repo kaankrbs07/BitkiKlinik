@@ -55,9 +55,13 @@ public class AuthController : ControllerBase
             
             _emailService.SendEmailInBackground(createdUser.Email, subject, message);
 
+            var tokenResponse = _tokenService.CreateToken(createdUser);
+
             return Ok(new 
             { 
-                Message = "Kariyerinize ilk adımı attınız! Lütfen e-posta adresinize gönderilen doğrulama kodunu girerek hesabınızı aktifleştirin."
+                Message = "Kariyerinize ilk adımı attınız! Lütfen e-posta adresinize gönderilen doğrulama kodunu girerek hesabınızı aktifleştirin.",
+                Token = tokenResponse.AccessToken,
+                RefreshToken = tokenResponse.RefreshToken
             });
         }
         catch (ArgumentException ex)
@@ -99,8 +103,20 @@ public class AuthController : ControllerBase
 
         if (!user.IsVerified)
         {
-            Console.WriteLine($"[Login] Hesap doğrulanmamış: {loginDto.Username}");
-            return Unauthorized(new { Message = "Lütfen önce e-posta adresinizi doğrulayın." });
+            Console.WriteLine($"[Login] Hesap doğrulanmamış, doğrulama kodu gönderiliyor ve oturum açılıyor: {loginDto.Username}");
+            
+            var random = new Random();
+            var verificationCode = random.Next(100000, 999999).ToString();
+            
+            user.VerificationCode = verificationCode;
+            user.VerificationCodeExpiryTime = DateTime.UtcNow.AddMinutes(15);
+            
+            await _userService.UpdateAsync(user);
+
+            var subject = "Bitki Klinik - Giriş E-posta Doğrulama Kodu";
+            var message = $"Merhaba {user.Username},<br><br>Giriş işleminizi tamamlamak ve hesabınızı aktifleştirmek için doğrulama kodunuz: <b>{verificationCode}</b><br><br>Bu kod 15 dakika boyunca geçerlidir.";
+            
+            _emailService.SendEmailInBackground(user.Email, subject, message);
         }
 
         var tokenResponse = _tokenService.CreateToken(user);
@@ -141,5 +157,44 @@ public class AuthController : ControllerBase
         await _userService.UpdateAsync(user);
 
         return Ok(new { Message = "E-posta adresiniz başarıyla doğrulandı. Artık giriş yapabilirsiniz." });
+    }
+
+    [HttpPost("resend-code")]
+    public async Task<IActionResult> ResendVerificationCode([FromBody] ResendCodeDTO dto)
+    {
+        try
+        {
+            if (string.IsNullOrEmpty(dto.Email))
+                return BadRequest(new { Message = "E-posta adresi boş olamaz." });
+
+            var user = await _userService.GetByEmailAsync(dto.Email);
+
+            if (user == null)
+                return NotFound(new { Message = "Bu e-posta adresine ait kayıtlı bir kullanıcı bulunamadı." });
+
+            if (user.IsVerified)
+                return BadRequest(new { Message = "Bu hesap zaten doğrulanmış." });
+
+            // Yeni rastgele 6 haneli doğrulama kodu oluştur
+            var random = new Random();
+            var verificationCode = random.Next(100000, 999999).ToString();
+            
+            user.VerificationCode = verificationCode;
+            user.VerificationCodeExpiryTime = DateTime.UtcNow.AddMinutes(15);
+            
+            await _userService.UpdateAsync(user);
+
+            // Doğrulama e-postasını arka planda gönder
+            var subject = "Bitki Klinik - Yeni E-posta Doğrulama Kodu";
+            var message = $"Merhaba {user.Username},<br><br>Hesabınızı aktifleştirmek için yeni doğrulama kodunuz: <b>{verificationCode}</b><br><br>Bu kod 15 dakika boyunca geçerlidir.";
+            
+            _emailService.SendEmailInBackground(user.Email, subject, message);
+
+            return Ok(new { Message = "Yeni doğrulama kodu e-posta adresinize gönderildi." });
+        }
+        catch (Exception ex)
+        {
+            return StatusCode(500, new { Message = "Doğrulama kodu gönderilirken bir hata oluştu: " + ex.Message });
+        }
     }
 }

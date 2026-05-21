@@ -108,6 +108,51 @@ using (var scope = app.Services.CreateScope())
     var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
     await db.Database.MigrateAsync();          // bekleyen migration varsa uygula
     await SeedData.InitialiseAsync(db);        // seed data (zaten doluysa atlar)
+
+    // Geçmişte kalan ve aktif öğrenme eşik değerinin altındaki taramaları aktif öğrenme kuyruğuna otomatik taşı
+    try
+    {
+        var activeLearningService = scope.ServiceProvider.GetRequiredService<IActiveLearningService>();
+        var logger = scope.ServiceProvider.GetRequiredService<ILogger<Program>>();
+        
+        var lowConfidenceScans = await db.PlantScans
+            .Where(s => s.Confidence < BitkiKlinik.API.Configuration.GlobalConstants.ActiveLearningThreshold)
+            .ToListAsync();
+
+        if (lowConfidenceScans.Any())
+        {
+            var enqueuedScanIds = await db.ActiveLearningQueue
+                .Where(q => q.ScanId != null)
+                .Select(q => q.ScanId!.Value)
+                .ToListAsync();
+
+            var newEnqueuesCount = 0;
+            foreach (var scan in lowConfidenceScans)
+            {
+                if (!enqueuedScanIds.Contains(scan.Id))
+                {
+                    await activeLearningService.EnqueueAsync(
+                        scanId: scan.Id,
+                        imagePath: scan.ImageUrl ?? string.Empty,
+                        predictedDisease: scan.DiseaseName,
+                        confidence: scan.Confidence,
+                        source: BitkiKlinik.API.Models.Enums.ActiveLearningSource.LowConfidence
+                    );
+                    newEnqueuesCount++;
+                }
+            }
+
+            if (newEnqueuesCount > 0)
+            {
+                logger.LogInformation("Başlangıçta {Count} adet geçmiş düşük güvenli tarama aktif öğrenme kuyruğuna eklendi.", newEnqueuesCount);
+            }
+        }
+    }
+    catch (Exception ex)
+    {
+        var logger = scope.ServiceProvider.GetRequiredService<ILogger<Program>>();
+        logger.LogError(ex, "Geçmiş taramalar aktif öğrenme kuyruğuna taşınırken hata oluştu.");
+    }
 }
 
 app.UseMiddleware<GlobalExceptionMiddleware>();
@@ -119,7 +164,10 @@ if (app.Environment.IsDevelopment())
     app.MapOpenApi();
 }
 
-app.UseHttpsRedirection();
+if (!app.Environment.IsDevelopment())
+{
+    app.UseHttpsRedirection();
+}
 app.UseStaticFiles(); // wwwroot/uploads/scans altındaki görselleri serve eder
 
 app.UseRateLimiter();

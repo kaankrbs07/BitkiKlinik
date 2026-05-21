@@ -98,7 +98,7 @@ export default function ResultScreen() {
             style={styles.image}
             resizeMode="cover"
           />
-          <View style={[styles.confidenceBadge, { backgroundColor: confidencePercent > 85 ? '#4cd964' : '#ff9500' }]}>
+          <View style={[styles.confidenceBadge, { backgroundColor: data.confidence >= CONFIG.ACTIVE_LEARNING_THRESHOLD ? '#10b981' : '#ef4444' }]}>
             <Ionicons name="checkmark-circle" size={16} color="white" style={{marginRight: 4}} />
             <Text style={styles.confidenceText}>%{confidencePercent} Güven</Text>
           </View>
