@@ -96,7 +96,7 @@ preprocess = transforms.Compose([
 ])
 
 # ─────────────────────────────────────────────
-#  GLOBAL DURUM
+#  GLOBAL DURUM & LOCKS
 # ─────────────────────────────────────────────
 state: dict = {
     "model"     : None,
@@ -112,6 +112,9 @@ state: dict = {
     "trained_files": [],
 }
 
+# Model yükleme ve inference işlemlerini senkronize etmek için kilit
+model_lock = threading.Lock()
+
 ALLOWED_CONTENT_TYPES = {
     "image/jpeg", "image/jpg", "image/png", "image/webp"
 }
@@ -125,47 +128,48 @@ def load_model() -> None:
     GPU yoksa veya FP32 bulunamazsa INT8 (CPU) modeline geçer.
     İkisi de yoksa hata fırlatır — servis başlamaz.
     """
-    # Sınıf haritası
-    if not CLASS_MAP_PATH.exists():
+    with model_lock:
+        # Sınıf haritası
+        if not CLASS_MAP_PATH.exists():
+            raise FileNotFoundError(
+                f"class_map.json bulunamadı: {CLASS_MAP_PATH}\n"
+                "Lütfen önce 'python train.py' ile modeli eğitin."
+            )
+        with CLASS_MAP_PATH.open(encoding="utf-8") as f:
+            state["class_map"] = json.load(f)   # {"0": "Apple__black_rot", ...}
+        logger.info("Sınıf haritası yüklendi: %d sınıf", len(state["class_map"]))
+
+        # GPU + FP32
+        if torch.cuda.is_available() and MODEL_FP32_PATH.exists():
+            device = torch.device("cuda")
+            model  = torch.jit.load(str(MODEL_FP32_PATH), map_location=device)
+            model.eval()
+            state.update(model=model, device=device, model_type="fp32")
+            logger.info("FP32 model GPU'ya yüklendi (%s)", torch.cuda.get_device_name(0))
+            return
+
+        # CPU + INT8
+        if MODEL_INT8_PATH.exists():
+            device = torch.device("cpu")
+            model  = torch.jit.load(str(MODEL_INT8_PATH), map_location=device)
+            model.eval()
+            state.update(model=model, device=device, model_type="int8")
+            logger.info("INT8 quantized model CPU'ya yüklendi")
+            return
+
+        # FP32 CPU fallback (GPU yok ama fp32 var)
+        if MODEL_FP32_PATH.exists():
+            device = torch.device("cpu")
+            model  = torch.jit.load(str(MODEL_FP32_PATH), map_location=device)
+            model.eval()
+            state.update(model=model, device=device, model_type="fp32-cpu")
+            logger.warning("FP32 model CPU'ya yüklendi — inference yavaş olabilir")
+            return
+
         raise FileNotFoundError(
-            f"class_map.json bulunamadı: {CLASS_MAP_PATH}\n"
+            f"Model dosyası bulunamadı: {MODEL_FP32_PATH} veya {MODEL_INT8_PATH}\n"
             "Lütfen önce 'python train.py' ile modeli eğitin."
         )
-    with CLASS_MAP_PATH.open(encoding="utf-8") as f:
-        state["class_map"] = json.load(f)   # {"0": "Apple__black_rot", ...}
-    logger.info("Sınıf haritası yüklendi: %d sınıf", len(state["class_map"]))
-
-    # GPU + FP32
-    if torch.cuda.is_available() and MODEL_FP32_PATH.exists():
-        device = torch.device("cuda")
-        model  = torch.jit.load(str(MODEL_FP32_PATH), map_location=device)
-        model.eval()
-        state.update(model=model, device=device, model_type="fp32")
-        logger.info("FP32 model GPU'ya yüklendi (%s)", torch.cuda.get_device_name(0))
-        return
-
-    # CPU + INT8
-    if MODEL_INT8_PATH.exists():
-        device = torch.device("cpu")
-        model  = torch.jit.load(str(MODEL_INT8_PATH), map_location=device)
-        model.eval()
-        state.update(model=model, device=device, model_type="int8")
-        logger.info("INT8 quantized model CPU'ya yüklendi")
-        return
-
-    # FP32 CPU fallback (GPU yok ama fp32 var)
-    if MODEL_FP32_PATH.exists():
-        device = torch.device("cpu")
-        model  = torch.jit.load(str(MODEL_FP32_PATH), map_location=device)
-        model.eval()
-        state.update(model=model, device=device, model_type="fp32-cpu")
-        logger.warning("FP32 model CPU'ya yüklendi — inference yavaş olabilir")
-        return
-
-    raise FileNotFoundError(
-        f"Model dosyası bulunamadı: {MODEL_FP32_PATH} veya {MODEL_INT8_PATH}\n"
-        "Lütfen önce 'python train.py' ile modeli eğitin."
-    )
 
 
 # ─────────────────────────────────────────────
@@ -178,42 +182,43 @@ def predict_tta(image: Image.Image, tta_passes: int = 5) -> tuple[str, float]:
     - Orijinal, Yatay Ters, Dikey Ters ve Hafif Döndürülmüş hallerini analiz eder.
     - Softmax çıktılarını ortalar.
     """
-    all_probs = []
-    
-    def get_prob(img: Image.Image) -> torch.Tensor:
-        # Normalizasyon uygula ve tahmin et
-        tensor = preprocess(img).unsqueeze(0).to(state["device"])
-        logits = state["model"](tensor)
-        # Temperature Scaling (0.4)
-        return torch.softmax(logits / 0.4, dim=1)  # type: ignore
-    
-    # Pass 1: Orijinal
-    all_probs.append(get_prob(image))
-    
-    if tta_passes > 1:
-        # Pass 2: Yatay Çevirme
-        flipped_h = F.hflip(image)  # type: ignore
-        all_probs.append(get_prob(flipped_h))
+    with model_lock:
+        all_probs = []
         
-        # Pass 3: Dikey Çevirme
-        flipped_v = F.vflip(image)  # type: ignore
-        all_probs.append(torch.softmax(state["model"](preprocess(flipped_v).unsqueeze(0).to(state["device"])), dim=1))
+        def get_prob(img: Image.Image) -> torch.Tensor:
+            # Normalizasyon uygula ve tahmin et
+            tensor = preprocess(img).unsqueeze(0).to(state["device"])
+            logits = state["model"](tensor)
+            # Temperature Scaling (0.4)
+            return torch.softmax(logits / 0.4, dim=1)  # type: ignore
         
-        # Pass 4: Hafif Saat Yönünde Döndürme
-        rot_p = F.rotate(image, 5)  # type: ignore
-        all_probs.append(torch.softmax(state["model"](preprocess(rot_p).unsqueeze(0).to(state["device"])), dim=1))
+        # Pass 1: Orijinal
+        all_probs.append(get_prob(image))
         
-        # Pass 5: Hafif Saat Yönü Tersine Döndürme
-        rot_n = F.rotate(image, -5)  # type: ignore
-        all_probs.append(torch.softmax(state["model"](preprocess(rot_n).unsqueeze(0).to(state["device"])), dim=1))
+        if tta_passes > 1:
+            # Pass 2: Yatay Çevirme
+            flipped_h = F.hflip(image)  # type: ignore
+            all_probs.append(get_prob(flipped_h))
+            
+            # Pass 3: Dikey Çevirme
+            flipped_v = F.vflip(image)  # type: ignore
+            all_probs.append(torch.softmax(state["model"](preprocess(flipped_v).unsqueeze(0).to(state["device"])), dim=1))
+            
+            # Pass 4: Hafif Saat Yönünde Döndürme
+            rot_p = F.rotate(image, 5)  # type: ignore
+            all_probs.append(torch.softmax(state["model"](preprocess(rot_p).unsqueeze(0).to(state["device"])), dim=1))
+            
+            # Pass 5: Hafif Saat Yönü Tersine Döndürme
+            rot_n = F.rotate(image, -5)  # type: ignore
+            all_probs.append(torch.softmax(state["model"](preprocess(rot_n).unsqueeze(0).to(state["device"])), dim=1))
 
-    # Tüm pass'lerin ortalamasını al
-    avg_probs  = torch.stack(all_probs).mean(dim=0)
-    confidence = float(avg_probs.max())
-    class_idx  = str(int(avg_probs.argmax()))
+        # Tüm pass'lerin ortalamasını al
+        avg_probs  = torch.stack(all_probs).mean(dim=0)
+        confidence = float(avg_probs.max())
+        class_idx  = str(int(avg_probs.argmax()))
 
-    label = state["class_map"].get(class_idx, f"unknown_{class_idx}")
-    return label, confidence
+        label = state["class_map"].get(class_idx, f"unknown_{class_idx}")
+        return label, confidence
 
 
 # ─────────────────────────────────────────────
@@ -245,7 +250,7 @@ app = FastAPI(
 # ─────────────────────────────────────────────
 
 @app.post("/analyze")
-async def analyze(file: UploadFile = File(...)):
+def analyze(file: UploadFile = File(...)):
     """
     Bitki görseli analiz eder.
 
@@ -268,7 +273,7 @@ async def analyze(file: UploadFile = File(...)):
                    f"İzin verilenler: {', '.join(ALLOWED_CONTENT_TYPES)}"
         )
 
-    image_bytes = await file.read()
+    image_bytes = file.file.read()
     if not image_bytes:
         raise HTTPException(status_code=400, detail="Yüklenen dosya boş.")
 
@@ -305,7 +310,7 @@ async def health():
 
 
 @app.post("/active-learning/add-sample")
-async def add_sample(file: UploadFile = File(...), label: str = Form(...)):
+def add_sample(file: UploadFile = File(...), label: str = Form(...)):
     """
     Aktif öğrenme için yeni bir görsel örneği ekler.
     Görsel 'data/active_learning/{label}/' klasörüne kaydedilir.
@@ -339,7 +344,7 @@ async def add_sample(file: UploadFile = File(...), label: str = Form(...)):
         unique_filename = f"{uuid.uuid4()}{file_extension}"
         file_path = label_dir / unique_filename
 
-        image_bytes = await file.read()
+        image_bytes = file.file.read()
         with file_path.open("wb") as f:
             f.write(image_bytes)
 
@@ -418,7 +423,7 @@ async def retrain():
 
 
 @app.get("/active-learning/retrain-status")
-async def retrain_status():
+def retrain_status():
     """
     Yeniden eğitim durumunu ve aktif öğrenme veri seti istatistiklerini döner.
     """

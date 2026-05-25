@@ -25,9 +25,13 @@ BitkiKlinik/.env*.local
 # .NET Backend (BitkiKlinik.API)
 BitkiKlinik.API/bin/
 BitkiKlinik.API/obj/
+BitkiKlinik.API/wwwroot/uploads/
 
 # Python ML (BitkiKlinik.ML)
 BitkiKlinik.ML/venv/
 BitkiKlinik.ML/__pycache__/
 BitkiKlinik.ML/*.pyc
 BitkiKlinik.ML/.ipynb_checkpoints/
+BitkiKlinik.ML/data/
+BitkiKlinik.ML/outputs/
+BitkiKlinik.ML/Dependencies.zip

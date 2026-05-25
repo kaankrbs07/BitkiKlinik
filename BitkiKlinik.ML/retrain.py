@@ -1,5 +1,6 @@
 import os
 import json
+import time
 import torch
 import torch.nn as nn
 import torch.optim as optim
@@ -146,6 +147,9 @@ def retrain_model(progress_callback=None):
             total += targets.size(0)
             correct += predicted.eq(targets).sum().item()
             
+            # Ana asyncio event loop'unun dış istekleri işleyebilmesi için GIL'i anlık serbest bırak
+            time.sleep(0.01)
+            
         train_loss = running_loss / total if total > 0 else 0
         train_acc = correct / total if total > 0 else 0
         
@@ -165,6 +169,9 @@ def retrain_model(progress_callback=None):
                 val_total += targets.size(0)
                 val_correct += predicted.eq(targets).sum().item()
                 
+                # GIL serbest bırak
+                time.sleep(0.01)
+                
         valid_loss = val_loss / val_total if val_total > 0 else 0
         valid_acc = val_correct / val_total if val_total > 0 else 0
         
@@ -172,6 +179,9 @@ def retrain_model(progress_callback=None):
         
         if progress_callback:
             progress_callback(epoch + 1, epochs, train_loss, train_acc, valid_loss, valid_acc)
+            
+        # Epoch bitiminde event loop'a ek nefes alma süresi ver
+        time.sleep(0.05)
             
     # Güncellenmiş ağırlıkları .pth olarak kaydet
     checkpoint["model_state_dict"] = model.state_dict()
