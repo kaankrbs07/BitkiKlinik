@@ -14,16 +14,22 @@ export default function AdminLayout() {
   );
   const router = useRouter();
 
-  // ── Route Guard: Admin değilse geri gönder ─────────────────────
+  // ── Route Guard: Giriş yapmış ama Admin değilse geri gönder ────────────────
+  // Not: Giriş yapmamış kullanıcılar zaten Root Layout tarafından
+  // /(auth)/login'e yönlendirilir, bu yüzden burada sadece
+  // "giriş yapmış ama admin değil" durumunu kontrol ediyoruz.
   useEffect(() => {
-    if (!isAuthenticated || !isAdmin) {
-      console.log('[AdminLayout] Yetkisiz erişim, yönlendiriliyor...');
-      router.replace('/(tabs)');
+    if (isAuthenticated && !isAdmin) {
+      const timeout = setTimeout(() => {
+        console.log('[AdminLayout] Yetkisiz erişim, yönlendiriliyor...');
+        router.replace('/(tabs)');
+      }, 0);
+      return () => clearTimeout(timeout);
     }
   }, [isAdmin, isAuthenticated]);
 
-  if (!isAdmin) return null; // Guard aktifken render etme
-
+  // Stack her zaman render edilmeli — navigator mount olmadan navigate çağrısı
+  // "Attempted to navigate before mounting" hatasına yol açar.
   return (
     <Stack
       screenOptions={{

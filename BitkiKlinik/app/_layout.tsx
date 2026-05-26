@@ -45,25 +45,33 @@ export default function RootLayout() {
       return; // logout store'u günceller → useEffect tekrar tetiklenir
     }
 
-    const inAuthGroup  = segments[0] === '(auth)';
-    const isVerifyScreen = segments[1] === 'verify';
+    // setTimeout ile bir sonraki event loop tick'ine ertele.
+    // Bu, NavigationContainer'ın onReady callback'inin çalışmasını garanti eder.
+    // useRootNavigationState()?.key kontrolü yeterli değildir çünkü
+    // navigation state'in key'i, navigationRef.isReady() true olmadan önce oluşabilir.
+    const timeout = setTimeout(() => {
+      const inAuthGroup  = segments[0] === '(auth)';
+      const isVerifyScreen = segments[1] === 'verify';
 
-    if (!isAuthenticated) {
-      if (!inAuthGroup) {
-        router.replace('/(auth)/login');
-      }
-    } else {
-      if (!isVerified) {
-        if (!inAuthGroup || !isVerifyScreen) {
-          const email = useAuthStore.getState().email || '';
-          router.replace({ pathname: '/(auth)/verify', params: { email } });
+      if (!isAuthenticated) {
+        if (!inAuthGroup) {
+          router.replace('/(auth)/login');
         }
       } else {
-        if (inAuthGroup) {
-          router.replace('/(tabs)');
+        if (!isVerified) {
+          if (!inAuthGroup || !isVerifyScreen) {
+            const email = useAuthStore.getState().email || '';
+            router.replace({ pathname: '/(auth)/verify', params: { email } });
+          }
+        } else {
+          if (inAuthGroup) {
+            router.replace('/(tabs)');
+          }
         }
       }
-    }
+    }, 0);
+
+    return () => clearTimeout(timeout);
   }, [isAuthenticated, isVerified, token, segments]);
 
 
