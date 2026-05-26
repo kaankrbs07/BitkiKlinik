@@ -41,34 +41,16 @@ public class DiseasesController : ControllerBase
     /// Tüm hastalıkları ve bunlara ait doğal/kimyasal tedavileri listeler.
     /// Bitki Hastalıkları Ansiklopedisi (Tıbbi Rehber) için kullanılır.
     /// </summary>
+    /// <remarks>
+    /// Tek bir SQL sorgusu (Include + ThenInclude) kullanır — N+1 yok.
+    /// </remarks>
     [HttpGet]
     public async Task<IActionResult> GetAllDiseases()
     {
-        try
-        {
-            var diseases = await _diseaseService.GetAllAsync();
-            var result = new List<object>();
-
-            foreach (var disease in diseases)
-            {
-                var treatments = await _treatmentService.GetTreatmentsByDiseaseIdAsync(disease.Id);
-                result.Add(new
-                {
-                    Id = disease.Id,
-                    Name = disease.Name,
-                    Description = disease.Description,
-                    ModelLabel = disease.ModelLabel,
-                    Treatments = treatments
-                });
-            }
-
-            return Ok(result);
-        }
-        catch (Exception ex)
-        {
-            return StatusCode(500, new { Message = "Hastalıklar listelenirken bir hata oluştu.", Error = ex.Message });
-        }
+        var result = await _diseaseService.GetAllWithTreatmentsAsync();
+        return Ok(result);
     }
+
 
     /// <summary>
     /// Hastalık adına göre hastalık ve tedavi bilgilerini döndürür.

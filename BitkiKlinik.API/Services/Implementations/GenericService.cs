@@ -40,9 +40,19 @@ public class GenericService<T> : IGenericService<T> where T : class
 
     public async Task UpdateAsync(T entity)
     {
-        _context.Entry(entity).State = EntityState.Modified;
+        // EntityState.Detached: context bu entity'yi tanımıyor, elle Attach et.
+        // Diğer tüm durumlarda (Added, Modified, Unchanged) EF zaten takip ediyor;
+        // SaveChangesAsync sadece gerçekten değişen property'leri UPDATE eder.
+        var entry = _context.Entry(entity);
+        if (entry.State == EntityState.Detached)
+        {
+            _dbSet.Attach(entity);
+            entry.State = EntityState.Modified;
+        }
+
         await _context.SaveChangesAsync();
     }
+
 
     public async Task DeleteAsync(int id)
     {

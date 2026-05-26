@@ -14,6 +14,7 @@ interface JwtPayload {
 // ─── Store State & Actions ───────────────────────────────────────────
 interface AuthState {
   token: string | null;
+  refreshToken: string | null;      // Kalıcı oturum için
   isAuthenticated: boolean;
   isVerified: boolean;
   userId: string | null;
@@ -23,7 +24,7 @@ interface AuthState {
   isAdmin: boolean;
   profilePictureUrl: string | null;
 
-  login: (token: string) => void;
+  login: (token: string, refreshToken?: string) => void;
   logout: () => void;
   updateUsername: (newUsername: string) => void;
   updateProfilePicture: (url: string | null) => void;
@@ -37,6 +38,7 @@ interface AuthState {
  */
 export const useAuthStore = create<AuthState>((set) => ({
   token: null,
+  refreshToken: null,
   isAuthenticated: false,
   isVerified: false,
   userId: null,
@@ -46,7 +48,7 @@ export const useAuthStore = create<AuthState>((set) => ({
   isAdmin: false,
   profilePictureUrl: null,
 
-  login: (token: string) => {
+  login: (token: string, refreshToken?: string) => {
     try {
       // JWT'yi decode et → role ve isVerified claim'ini çıkar
       const decoded = jwtDecode<JwtPayload>(token);
@@ -54,6 +56,7 @@ export const useAuthStore = create<AuthState>((set) => ({
 
       set({
         token,
+        refreshToken: refreshToken ?? null,
         isAuthenticated: true,
         isVerified,
         userId: decoded.nameid,
@@ -65,13 +68,14 @@ export const useAuthStore = create<AuthState>((set) => ({
     } catch (error) {
       console.error('[AuthStore] JWT decode hatası:', error);
       // Decode edilemezse yine de token'ı kaydet (geriye dönük uyumluluk)
-      set({ token, isAuthenticated: true, isVerified: false });
+      set({ token, refreshToken: refreshToken ?? null, isAuthenticated: true, isVerified: false });
     }
   },
 
   logout: () => {
     set({
       token: null,
+      refreshToken: null,
       isAuthenticated: false,
       isVerified: false,
       userId: null,

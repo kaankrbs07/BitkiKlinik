@@ -14,12 +14,21 @@ public class TokenService : ITokenService
     private readonly IConfiguration _config;
     private readonly SymmetricSecurityKey _key;
 
+    // Refresh token'ın geçerlilik süresi (gün).
+    // Üretimde appsettings'ten okunabilir; şimdilik sabit 7 gün.
+    private const int RefreshTokenExpiryDays = 7;
+
     public TokenService(IConfiguration config)
     {
         _config = config;
         _key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(_config["Jwt:Key"]!));
     }
 
+    /// <summary>
+    /// Yeni bir access token + refresh token çifti üretir.
+    /// Refresh token kullanıcı nesnesine yazılır; çağıran kod kullanıcıyı
+    /// veritabanına kaydetmelidir (SaveChangesAsync).
+    /// </summary>
     public AuthDTO CreateToken(Users user)
     {
         var claims = new List<Claim>
@@ -44,11 +53,16 @@ public class TokenService : ITokenService
 
         var tokenHandler = new JwtSecurityTokenHandler();
         var token = tokenHandler.CreateToken(tokenDescriptor);
-        
+
+        // Yeni refresh token üret ve kullanıcı nesnesine yaz
+        var refreshToken = GenerateRefreshToken();
+        user.RefreshToken       = refreshToken;
+        user.RefreshTokenExpiry = DateTime.UtcNow.AddDays(RefreshTokenExpiryDays);
+
         return new AuthDTO
         {
-            AccessToken = tokenHandler.WriteToken(token),
-            RefreshToken = GenerateRefreshToken()
+            AccessToken  = tokenHandler.WriteToken(token),
+            RefreshToken = refreshToken
         };
     }
 
@@ -60,3 +74,4 @@ public class TokenService : ITokenService
         return Convert.ToBase64String(randomNumber);
     }
 }
+

@@ -26,21 +26,40 @@ public class UsersController : ControllerBase
     }
 
     // ────────────────────────────────────────────────────────────────
-    //  GET  /api/users              → Tüm kullanıcıları listele
+    //  GET  /api/users?page=1&pageSize=20  → Sayfalı kullanıcı listesi
     // ────────────────────────────────────────────────────────────────
 
     /// <summary>
-    /// Tüm aktif ve pasif kullanıcıları listeler (admin görünümü).
+    /// Tüm kullanıcıları sayfalı olarak listeler (admin görünümü).
+    /// Büyüyen kullanıcı tabanında tüm tabloyu belleğe yüklemez.
     /// </summary>
     [HttpGet]
-    public async Task<IActionResult> GetAllUsers()
+    public async Task<IActionResult> GetAllUsers(
+        [FromQuery] int page     = 1,
+        [FromQuery] int pageSize = 20)
     {
-        // Admin tüm kullanıcıları görmeli (pasif olanlar dahil)
-        var users = await _userService.FindAsync(_ => true);
+        // Girdi sınırlama
+        page     = Math.Max(1, page);
+        pageSize = Math.Clamp(pageSize, 1, 100);
 
-        var result = users.Select(MapToResponseDTO);
+        var allUsers = await _userService.FindAsync(_ => true);
 
-        return Ok(result);
+        var totalCount = allUsers.Count();
+        var totalPages = (int)Math.Ceiling(totalCount / (double)pageSize);
+
+        var paged = allUsers
+            .OrderBy(u => u.Id)
+            .Skip((page - 1) * pageSize)
+            .Take(pageSize)
+            .Select(MapToResponseDTO);
+
+        // Sayfalama meta verisi header'a eklenir (body'yi şişirme)
+        Response.Headers["X-Total-Count"] = totalCount.ToString();
+        Response.Headers["X-Total-Pages"] = totalPages.ToString();
+        Response.Headers["X-Current-Page"] = page.ToString();
+        Response.Headers["Access-Control-Expose-Headers"] = "X-Total-Count, X-Total-Pages, X-Current-Page";
+
+        return Ok(paged);
     }
 
     // ────────────────────────────────────────────────────────────────

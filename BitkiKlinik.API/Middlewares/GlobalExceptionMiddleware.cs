@@ -1,7 +1,14 @@
-﻿using Microsoft.Data.SqlClient;
+using Microsoft.Data.SqlClient;
 
 namespace BitkiKlinik.API.Middlewares;
 
+/// <summary>
+/// Controllerlardan kaçan işlenmemiş exception'ları yakalar ve tutarlı bir JSON hata yanıtı döner.
+///
+/// ÖNEMLI: ArgumentException bu middleware'de kasıtlı olarak yakalanmıyor.
+/// Her controller kendi ArgumentException'larını daha spesifik kullanıcı mesajlarıyla
+/// handle eder. Bu middleware yalnızca gerçekten beklenmedik hataları kapsar.
+/// </summary>
 public sealed class GlobalExceptionMiddleware
 {
     private readonly RequestDelegate _next;
@@ -24,15 +31,11 @@ public sealed class GlobalExceptionMiddleware
             var traceId = context.TraceIdentifier;
             var (message, status) = MapToError(ex);
 
-            // Ayrıntılar logda:
             _logger.LogError(ex, "Unhandled exception message={Message} traceId={TraceId} path={Path}",
                 message, traceId, context.Request.Path);
 
-            // Kullanıcıya sadece KOD
-            context.Response.StatusCode = status;
+            context.Response.StatusCode  = status;
             context.Response.ContentType = "application/json";
-
-            // İzi header'a koy, body'de göstermiyoruz
             context.Response.Headers["X-Correlation-ID"] = traceId;
 
             await context.Response.WriteAsJsonAsync(new { Error = message });
@@ -41,10 +44,11 @@ public sealed class GlobalExceptionMiddleware
 
     private static (string Message, int Status) MapToError(Exception ex) => ex switch
     {
-        SqlException                => ("Veritabanında bir hata oluştu.", StatusCodes.Status500InternalServerError),
-        UnauthorizedAccessException => ("Bu kaynağa erişim izniniz yok.", StatusCodes.Status401Unauthorized),
-        KeyNotFoundException        => ("stenilen kaynak bulunamadı.", StatusCodes.Status404NotFound),
-        ArgumentException           => ("Geçersiz istek verisi.", StatusCodes.Status400BadRequest),
-        _                           => ("Beklenmeyen bir hata oluştu.", StatusCodes.Status500InternalServerError)
+        SqlException                => ("Veritabanında bir hata oluştu.",   StatusCodes.Status500InternalServerError),
+        UnauthorizedAccessException => ("Bu kaynağa erişim izniniz yok.",   StatusCodes.Status401Unauthorized),
+        KeyNotFoundException        => ("İstenen kaynak bulunamadı.",        StatusCodes.Status404NotFound),
+        // ArgumentException kasıtlı olarak çıkarıldı: her controller kendi mesajıyla handle eder.
+        _                          => ("Beklenmeyen bir hata oluştu.",       StatusCodes.Status500InternalServerError)
     };
 }
+

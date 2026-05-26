@@ -1,4 +1,4 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useCallback } from 'react';
 import { 
   View, 
   Text, 
@@ -24,6 +24,7 @@ import { useAuthStore } from '../../store/useAuthStore';
 import { useDashboardData, RecentScan } from '../../hooks/useDashboardData';
 import { useProfile } from '../../hooks/useProfile';
 import { CONFIG } from '../../constants/config';
+import { CARE_TIPS } from '../../constants/care-data';
 
 const { width } = Dimensions.get('window');
 
@@ -40,11 +41,7 @@ const COLORS = {
   dangerLight: '#fee2e2',
 };
 
-const careTips = [
-  { id: 1, title: 'Su Dengesi', icon: 'water', color: '#3b82f6', text: 'Sabah erken saatlerde sulama yapın.' },
-  { id: 2, title: 'Işık İhtiyacı', icon: 'sunny', color: '#f59e0b', text: 'Yapraklar sararıyorsa ışık yetersizdir.' },
-  { id: 3, title: 'Toprak Kalitesi', icon: 'flower', color: '#8b4513', text: 'Toprak pH değerini ayda bir kontrol edin.' },
-];
+
 
 /**
  * Tarih formatı: ISO 8601 → "12 Eki 2026" şeklinde okunabilir Türkçe formata çevirir.
@@ -206,14 +203,14 @@ function TipsSection() {
       <View style={styles.sectionHeader}>
         <Text style={styles.sectionTitle}>Bakım İpuçları</Text>
       </View>
-      <ScrollView 
-        horizontal 
+      <ScrollView
+        horizontal
         showsHorizontalScrollIndicator={false}
         contentContainerStyle={styles.tipsList}
       >
-        {careTips.map((tip, index) => (
-          <Animated.View 
-            key={tip.id} 
+        {CARE_TIPS.map((tip, index) => (
+          <Animated.View
+            key={tip.id}
             entering={FadeInRight.delay(500 + index * 100).duration(800)}
           >
             <TouchableOpacity style={styles.tipCard} activeOpacity={0.85}>
@@ -221,7 +218,7 @@ function TipsSection() {
                 <Ionicons name={tip.icon as any} size={20} color={tip.color} />
               </View>
               <Text style={styles.tipTitle}>{tip.title}</Text>
-              <Text style={styles.tipText}>{tip.text}</Text>
+              <Text style={styles.tipText}>{tip.description}</Text>
             </TouchableOpacity>
           </Animated.View>
         ))}
@@ -229,6 +226,7 @@ function TipsSection() {
     </View>
   );
 }
+
 
 // ============================================================================
 // 6. HISTORY SECTION COMPONENT
@@ -330,10 +328,10 @@ export default function HomeScreen() {
     }
   }, [isAuthenticated, fetchProfile]);
 
-  const handleLogout = () => {
+  const handleLogout = useCallback(() => {
     logout();
     router.replace('/(auth)/login');
-  };
+  }, [logout, router]);
 
   return (
     <View style={styles.container}>

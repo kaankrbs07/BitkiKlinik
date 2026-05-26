@@ -55,21 +55,23 @@ export default function ScanScreen() {
 
       // Eğer başarılı olursa Result ekranına yönlendir
       if (response.data) {
-        // Obje aktarmak için router params (JSON string olarak basit yaklaşım)
         router.push({
           pathname: '/result',
           params: { data: JSON.stringify(response.data) }
         });
+        // Navigasyon tamamlandıktan sonra temizle; erken temizlemek
+        // yükleme overlay'inin flaş yapmasına neden olur.
+        setTimeout(() => setPhotoUri(null), 300);
       }
     } catch (error: any) {
       console.error(error);
       Alert.alert(
-        "Hata", 
+        "Hata",
         error.response?.data?.Message || "Fotoğraf yüklenirken veya analiz edilirken bir hata oluştu."
       );
+      // Hata durumunda da önizlemeyi koru; kullanıcı tekrar deneyebilir.
     } finally {
       setIsScanning(false);
-      setPhotoUri(null); // Reset after finish
     }
   };
 

@@ -2,6 +2,8 @@ using BitkiKlinik.API.DTOs;
 using BitkiKlinik.API.Models;
 using BitkiKlinik.API.Services.Interfaces;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.RateLimiting;
+using System.Security.Cryptography;
 
 namespace BitkiKlinik.API.Controllers;
 
@@ -13,20 +15,25 @@ public class AuthController : ControllerBase
     private readonly ITokenService _tokenService;
     private readonly IPasswordHasher _passwordHasher;
     private readonly IEmailService _emailService;
+    private readonly ILogger<AuthController> _logger;
 
     public AuthController(
         IUserService userService,
         ITokenService tokenService,
         IPasswordHasher passwordHasher,
-        IEmailService emailService)
+        IEmailService emailService,
+        ILogger<AuthController> logger)
     {
         _userService    = userService;
         _tokenService   = tokenService;
         _passwordHasher = passwordHasher;
         _emailService   = emailService;
+        _logger         = logger;
     }
 
+    // ── POST /api/auth/register ────────────────────────────────────────────
     [HttpPost("register")]
+    [EnableRateLimiting("AuthPolicy")]
     public async Task<IActionResult> Register([FromBody] UserRegisterDTO registerDto)
     {
         try
@@ -34,33 +41,33 @@ public class AuthController : ControllerBase
             var user = new Users
             {
                 Username = registerDto.Username,
-                Email = registerDto.Email,
-                Password = registerDto.Password // Hashleme UserService.CreateUserAsync içinde yapılır.
+                Email    = registerDto.Email,
+                Password = registerDto.Password  // Hashleme UserService.CreateUserAsync içinde yapılır.
             };
 
             var createdUser = await _userService.CreateUserAsync(user);
 
-            // Rastgele 6 haneli doğrulama kodu oluştur
-            var random = new Random();
-            var verificationCode = random.Next(100000, 999999).ToString();
-            
-            createdUser.VerificationCode = verificationCode;
+            // Güvenli 6 haneli OTP
+            var verificationCode = GenerateOtp();
+            createdUser.VerificationCode           = verificationCode;
             createdUser.VerificationCodeExpiryTime = DateTime.UtcNow.AddMinutes(15);
-            
-            await _userService.UpdateAsync(createdUser);
 
-            // Doğrulama e-postasını arka planda gönder (Axios timeout'u önlemek için)
-            var subject = "Bitki Klinik - E-posta Doğrulama Kodu";
-            var message = $"Merhaba {createdUser.Username},<br><br>Kayıt işleminizi tamamlamak için doğrulama kodunuz: <b>{verificationCode}</b><br><br>Bu kod 15 dakika boyunca geçerlidir.";
-            
-            _emailService.SendEmailInBackground(createdUser.Email, subject, message);
-
+            // Token üret → refresh token kullanıcıya yazılır
             var tokenResponse = _tokenService.CreateToken(createdUser);
 
-            return Ok(new 
-            { 
-                Message = "Kariyerinize ilk adımı attınız! Lütfen e-posta adresinize gönderilen doğrulama kodunu girerek hesabınızı aktifleştirin.",
-                Token = tokenResponse.AccessToken,
+            // Token + OTP bilgileri tek sorguda kaydet
+            await _userService.UpdateAsync(createdUser);
+
+            var subject = "Bitki Klinik - E-posta Doğrulama Kodu";
+            var message = $"Merhaba {createdUser.Username},<br><br>Kayıt işleminizi tamamlamak için doğrulama kodunuz: <b>{verificationCode}</b><br><br>Bu kod 15 dakika boyunca geçerlidir.";
+            _emailService.SendEmailInBackground(createdUser.Email, subject, message);
+
+            _logger.LogInformation("Yeni kullanıcı kaydı: {Username}", createdUser.Username);
+
+            return Ok(new
+            {
+                Message      = "Kariyerinize ilk adımı attınız! Lütfen e-posta adresinize gönderilen doğrulama kodunu girerek hesabınızı aktifleştirin.",
+                Token        = tokenResponse.AccessToken,
                 RefreshToken = tokenResponse.RefreshToken
             });
         }
@@ -70,67 +77,91 @@ public class AuthController : ControllerBase
         }
         catch (Exception ex)
         {
-            // Geliştirme sürecinde hatayı net görmek için mesajı dönüyoruz
-            return StatusCode(500, new { message = "Sunucu tarafında bir hata oluştu: " + ex.Message });
+            _logger.LogError(ex, "Kayıt sırasında beklenmeyen hata. Username: {Username}", registerDto.Username);
+            return StatusCode(500, new { Message = "Sunucu tarafında bir hata oluştu." });
         }
     }
 
+    // ── POST /api/auth/login ───────────────────────────────────────────────
     [HttpPost("login")]
+    [EnableRateLimiting("AuthPolicy")]
     public async Task<IActionResult> Login([FromBody] UserLoginDTO loginDto)
     {
-        // Hem kullanıcı adı hem de e-posta ile girişi destekle
-        var user = await _userService.GetByUsernameAsync(loginDto.Username) 
+        // Hem kullanıcı adı hem e-posta ile giriş desteği
+        var user = await _userService.GetByUsernameAsync(loginDto.Username)
                    ?? await _userService.GetByEmailAsync(loginDto.Username);
 
-        if (user == null)
+        if (user == null || !_passwordHasher.Verify(loginDto.Password, user.Password))
         {
-            Console.WriteLine($"[Login] Kullanıcı bulunamadı: {loginDto.Username}");
-            return Unauthorized(new { Message = "Geçersiz kullanıcı adı veya şifre." });
-        }
-
-        // BCrypt ile hash karşılaştırması
-        if (!_passwordHasher.Verify(loginDto.Password, user.Password))
-        {
-            Console.WriteLine($"[Login] Şifre hatalı: {loginDto.Username}");
+            // Kullanıcı adı/şifre hataları bilinçli olarak aynı mesajla döner (enumeration önleme)
+            _logger.LogWarning("Başarısız giriş denemesi. Girdi: {Input}", loginDto.Username);
             return Unauthorized(new { Message = "Geçersiz kullanıcı adı veya şifre." });
         }
 
         if (!user.IsActive)
         {
-            Console.WriteLine($"[Login] Hesap pasif: {loginDto.Username}");
+            _logger.LogWarning("Pasif hesaba giriş denemesi. UserId: {UserId}", user.Id);
             return Unauthorized(new { Message = "Hesabınız pasif duruma alınmış." });
         }
 
         if (!user.IsVerified)
         {
-            Console.WriteLine($"[Login] Hesap doğrulanmamış, doğrulama kodu gönderiliyor ve oturum açılıyor: {loginDto.Username}");
-            
-            var random = new Random();
-            var verificationCode = random.Next(100000, 999999).ToString();
-            
-            user.VerificationCode = verificationCode;
+            _logger.LogInformation("Doğrulanmamış hesap girişi, yeni OTP gönderiliyor. UserId: {UserId}", user.Id);
+
+            var verificationCode = GenerateOtp();
+            user.VerificationCode           = verificationCode;
             user.VerificationCodeExpiryTime = DateTime.UtcNow.AddMinutes(15);
-            
-            await _userService.UpdateAsync(user);
 
             var subject = "Bitki Klinik - Giriş E-posta Doğrulama Kodu";
-            var message = $"Merhaba {user.Username},<br><br>Giriş işleminizi tamamlamak ve hesabınızı aktifleştirmek için doğrulama kodunuz: <b>{verificationCode}</b><br><br>Bu kod 15 dakika boyunca geçerlidir.";
-            
+            var message = $"Merhaba {user.Username},<br><br>Hesabınızı aktifleştirmek için doğrulama kodunuz: <b>{verificationCode}</b><br><br>Bu kod 15 dakika boyunca geçerlidir.";
             _emailService.SendEmailInBackground(user.Email, subject, message);
         }
 
+        // Token üret → refresh token kullanıcıya yazılır
         var tokenResponse = _tokenService.CreateToken(user);
-        
-        Console.WriteLine($"[Login] Başarılı giriş: {loginDto.Username}");
+        await _userService.UpdateAsync(user);
 
-        return Ok(new 
-        { 
-            Message = "Giriş başarılı.", 
-            Token = tokenResponse.AccessToken,
+        _logger.LogInformation("Başarılı giriş. UserId: {UserId}", user.Id);
+
+        return Ok(new
+        {
+            Message      = "Giriş başarılı.",
+            Token        = tokenResponse.AccessToken,
             RefreshToken = tokenResponse.RefreshToken
         });
     }
 
+    // ── POST /api/auth/refresh ─────────────────────────────────────────────
+    /// <summary>
+    /// Geçerli bir refresh token ile yeni bir access + refresh token çifti döndürür.
+    /// Eski refresh token geçersiz kılınır (token rotation).
+    /// </summary>
+    [HttpPost("refresh")]
+    [EnableRateLimiting("AuthPolicy")]
+    public async Task<IActionResult> RefreshToken([FromBody] RefreshTokenRequestDTO dto)
+    {
+        var user = await _userService.GetByRefreshTokenAsync(dto.RefreshToken);
+
+        if (user == null)
+        {
+            _logger.LogWarning("Geçersiz veya süresi dolmuş refresh token denemesi.");
+            return Unauthorized(new { Message = "Refresh token geçersiz veya süresi dolmuş. Lütfen tekrar giriş yapın." });
+        }
+
+        // Yeni token çifti üret → eski refresh token otomatik olarak değiştirilir (rotation)
+        var tokenResponse = _tokenService.CreateToken(user);
+        await _userService.UpdateAsync(user);
+
+        _logger.LogInformation("Refresh token döndürüldü. UserId: {UserId}", user.Id);
+
+        return Ok(new
+        {
+            Token        = tokenResponse.AccessToken,
+            RefreshToken = tokenResponse.RefreshToken
+        });
+    }
+
+    // ── POST /api/auth/verify-email ───────────────────────────────────────
     [HttpPost("verify-email")]
     public async Task<IActionResult> VerifyEmail([FromBody] UserVerifyEmailDTO verifyDto)
     {
@@ -142,59 +173,64 @@ public class AuthController : ControllerBase
         if (user.IsVerified)
             return BadRequest(new { Message = "Bu hesap zaten doğrulanmış." });
 
-        // Kod ve Süre Kontrolü
         if (user.VerificationCode != verifyDto.Code)
             return BadRequest(new { Message = "Geçersiz doğrulama kodu." });
 
         if (user.VerificationCodeExpiryTime < DateTime.UtcNow)
             return BadRequest(new { Message = "Doğrulama kodunun süresi dolmuş. Lütfen yeni bir kod isteyin." });
 
-        // Doğrulama başarılı
-        user.IsVerified = true;
-        user.VerificationCode = null;
+        user.IsVerified                = true;
+        user.VerificationCode          = null;
         user.VerificationCodeExpiryTime = null;
 
         await _userService.UpdateAsync(user);
 
+        _logger.LogInformation("E-posta doğrulandı. UserId: {UserId}", user.Id);
+
         return Ok(new { Message = "E-posta adresiniz başarıyla doğrulandı. Artık giriş yapabilirsiniz." });
     }
 
+    // ── POST /api/auth/resend-code ────────────────────────────────────────
     [HttpPost("resend-code")]
+    [EnableRateLimiting("AuthPolicy")]
     public async Task<IActionResult> ResendVerificationCode([FromBody] ResendCodeDTO dto)
     {
-        try
-        {
-            if (string.IsNullOrEmpty(dto.Email))
-                return BadRequest(new { Message = "E-posta adresi boş olamaz." });
+        var user = await _userService.GetByEmailAsync(dto.Email);
 
-            var user = await _userService.GetByEmailAsync(dto.Email);
+        if (user == null)
+            return NotFound(new { Message = "Bu e-posta adresine ait kayıtlı bir kullanıcı bulunamadı." });
 
-            if (user == null)
-                return NotFound(new { Message = "Bu e-posta adresine ait kayıtlı bir kullanıcı bulunamadı." });
+        if (user.IsVerified)
+            return BadRequest(new { Message = "Bu hesap zaten doğrulanmış." });
 
-            if (user.IsVerified)
-                return BadRequest(new { Message = "Bu hesap zaten doğrulanmış." });
+        var verificationCode = GenerateOtp();
+        user.VerificationCode           = verificationCode;
+        user.VerificationCodeExpiryTime = DateTime.UtcNow.AddMinutes(15);
 
-            // Yeni rastgele 6 haneli doğrulama kodu oluştur
-            var random = new Random();
-            var verificationCode = random.Next(100000, 999999).ToString();
-            
-            user.VerificationCode = verificationCode;
-            user.VerificationCodeExpiryTime = DateTime.UtcNow.AddMinutes(15);
-            
-            await _userService.UpdateAsync(user);
+        await _userService.UpdateAsync(user);
 
-            // Doğrulama e-postasını arka planda gönder
-            var subject = "Bitki Klinik - Yeni E-posta Doğrulama Kodu";
-            var message = $"Merhaba {user.Username},<br><br>Hesabınızı aktifleştirmek için yeni doğrulama kodunuz: <b>{verificationCode}</b><br><br>Bu kod 15 dakika boyunca geçerlidir.";
-            
-            _emailService.SendEmailInBackground(user.Email, subject, message);
+        var subject = "Bitki Klinik - Yeni E-posta Doğrulama Kodu";
+        var message = $"Merhaba {user.Username},<br><br>Hesabınızı aktifleştirmek için yeni doğrulama kodunuz: <b>{verificationCode}</b><br><br>Bu kod 15 dakika boyunca geçerlidir.";
+        _emailService.SendEmailInBackground(user.Email, subject, message);
 
-            return Ok(new { Message = "Yeni doğrulama kodu e-posta adresinize gönderildi." });
-        }
-        catch (Exception ex)
-        {
-            return StatusCode(500, new { Message = "Doğrulama kodu gönderilirken bir hata oluştu: " + ex.Message });
-        }
+        _logger.LogInformation("Doğrulama kodu yeniden gönderildi. UserId: {UserId}", user.Id);
+
+        return Ok(new { Message = "Yeni doğrulama kodu e-posta adresinize gönderildi." });
+    }
+
+    // ── Private Helpers ────────────────────────────────────────────────────
+
+    /// <summary>
+    /// Kriptografik olarak güvenli 6 haneli OTP üretir.
+    /// System.Random yerine RandomNumberGenerator kullanır.
+    /// </summary>
+    private static string GenerateOtp()
+    {
+        // 0-999999 aralığında uniform dağılım, ardından sıfır dolgulu 6 haneye formatla
+        var bytes = new byte[4];
+        RandomNumberGenerator.Fill(bytes);
+        var value = (BitConverter.ToUInt32(bytes) % 900_000) + 100_000; // 100000-999999
+        return value.ToString();
     }
 }
+

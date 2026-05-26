@@ -33,7 +33,8 @@ export default function RegisterScreen() {
           text: 'Tamam', 
           onPress: () => {
             if (token) {
-              useAuthStore.getState().login(token);
+              const refreshToken = response.data?.refreshToken ?? response.data?.RefreshToken;
+              useAuthStore.getState().login(token, refreshToken ?? undefined);
             } else {
               router.replace({ pathname: '/(auth)/verify', params: { email } });
             }

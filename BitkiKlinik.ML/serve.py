@@ -12,11 +12,11 @@ Başlatma :
     uvicorn serve:app --host 0.0.0.0 --port 8000 --reload
 """
 
+import asyncio
 import io
 import json
 import logging
 import os
-import threading
 import uuid
 import datetime
 from contextlib import asynccontextmanager
@@ -360,6 +360,11 @@ def add_sample(file: UploadFile = File(...), label: str = Form(...)):
 async def retrain():
     """
     Arka planda modeli aktif öğrenme verileriyle yeniden eğitmeyi tetikler.
+
+    asyncio.to_thread() ile çalıştırılır:
+    - Eğitim bloklayan (CPU-bound) bir fonksiyondur; thread-pool executor'a taşınır.
+    - Event loop serbest kalır; diğer /analyze veya /health istekleri engellenmez.
+    - threading.Thread + time.sleep() GIL geçici çözümüne gerek kalmaz.
     """
     if state["training_status"] == "training":
         raise HTTPException(status_code=400, detail="Yeniden eğitim zaten devam ediyor.")
@@ -370,24 +375,28 @@ async def retrain():
         training_error=None
     )
 
-    def run_training_thread():
+    def _blocking_train() -> None:
+        """Thread-pool'da çalışan senkron eğitim fonksiyonu."""
         try:
             from retrain import retrain_model
-            
+
             def progress_cb(epoch, num_epochs, t_loss, t_acc, v_loss, v_acc):
                 state["training_progress"] = float(epoch) / float(num_epochs)
-                logger.info(f"Yeniden Eğitim İlerlemesi: Epoch {epoch}/{num_epochs} - Loss: {t_loss:.4f}, Val Acc: {v_acc:.4f}")
+                logger.info(
+                    "Yeniden Eğitim İlerlemesi: Epoch %d/%d - Loss: %.4f, Val Acc: %.4f",
+                    epoch, num_epochs, t_loss, v_acc
+                )
 
-            logger.info("Aktif öğrenme yeniden eğitimi arka planda başlatılıyor...")
+            logger.info("Aktif öğrenme yeniden eğitimi thread-pool'da başlatılıyor...")
             num_samples = retrain_model(progress_callback=progress_cb)
-            logger.info(f"Yeniden eğitim tamamlandı! Toplam {num_samples} örnek kullanıldı.")
-            
-            # Modeli sıcak yükleme (hot reload)
+            logger.info("Yeniden eğitim tamamlandı! Toplam %d örnek kullanıldı.", num_samples)
+
+            # Modeli sıcak yükleme (hot reload) — model_lock zaten load_model içinde
             logger.info("Yeni ağırlıklar sıcak-yükleniyor...")
             load_model()
             logger.info("Model başarıyla sıcak-yüklendi!")
 
-            # Bütün mevcut aktif öğrenme dosyalarını trained_files olarak kaydet
+            # Eğitilen dosya listesini güncelle
             all_files = []
             data_dir = Path("data/active_learning")
             if data_dir.exists():
@@ -395,30 +404,30 @@ async def retrain():
                     label_dir = data_dir / label
                     if label_dir.is_dir():
                         for f in os.listdir(label_dir):
-                            if f.lower().endswith(('.png', '.jpg', '.jpeg', '.webp')):
-                                rel_path = (label_dir / f).as_posix()
-                                all_files.append(rel_path)
+                            if f.lower().endswith((".png", ".jpg", ".jpeg", ".webp")):
+                                all_files.append((label_dir / f).as_posix())
 
-            state["trained_files"] = all_files
-            state["last_trained_at"] = datetime.datetime.now().isoformat()
+            state["trained_files"]   = all_files
+            state["last_trained_at"] = datetime.datetime.now(datetime.timezone.utc).isoformat()
             save_active_learning_meta(all_files)
 
             state.update(
                 training_status="success",
                 training_progress=1.0,
-                last_trained_at=state["last_trained_at"]
+                last_trained_at=state["last_trained_at"],
             )
-        except Exception as e:
-            logger.error(f"Yeniden eğitim hatası: {e}", exc_info=True)
+        except Exception as exc:
+            logger.error("Yeniden eğitim hatası: %s", exc, exc_info=True)
             state.update(
                 training_status="error",
-                training_error=str(e),
-                training_progress=0.0
+                training_error=str(exc),
+                training_progress=0.0,
             )
 
-    # Arka plan iş parçacığını başlat
-    threading.Thread(target=run_training_thread, daemon=True).start()
-    
+    # asyncio.to_thread: bloklayan _blocking_train'i thread-pool executor'a taşır.
+    # Event loop serbest kalır — GIL paylaşımı için time.sleep() gerekmiyor.
+    asyncio.ensure_future(asyncio.to_thread(_blocking_train))
+
     return JSONResponse(content={"message": "Yeniden eğitim arka planda başlatıldı."})
 
 

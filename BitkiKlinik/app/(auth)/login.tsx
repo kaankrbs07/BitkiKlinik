@@ -30,7 +30,7 @@ export default function LoginScreen() {
       
       if (response.data && response.data.token) {
         console.log("[Login] Token bulundu, store güncelleniyor...");
-        login(response.data.token);
+        login(response.data.token, response.data.refreshToken ?? undefined);
         
         console.log("[Login] Navigasyon tetikleniyor: /(tabs)");
         router.replace('/(tabs)');

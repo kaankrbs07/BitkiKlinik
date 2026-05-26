@@ -3,6 +3,7 @@ import { Stack, useRouter, useSegments } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import 'react-native-reanimated';
 import { useEffect } from 'react';
+import { jwtDecode } from 'jwt-decode';
 
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useAuthStore } from '../store/useAuthStore';
@@ -11,48 +12,59 @@ export const unstable_settings = {
   anchor: '(tabs)',
 };
 
+/** JWT'nin süresi dolmuş mu? exp saniye cinsinden döner, Date.now() ms cinsinden. */
+function isTokenExpired(token: string): boolean {
+  try {
+    const { exp } = jwtDecode<{ exp?: number }>(token);
+    if (!exp) return false;
+    return exp * 1000 < Date.now();
+  } catch {
+    return true; // Decode edilemezse geçersiz say
+  }
+}
+
 export default function RootLayout() {
   const colorScheme = useColorScheme();
-  const isAuthenticated = useAuthStore((state) => state.isAuthenticated);
-  const isVerified = useAuthStore((state) => state.isVerified);
+  const { isAuthenticated, isVerified, token, logout } = useAuthStore((state) => ({
+    isAuthenticated: state.isAuthenticated,
+    isVerified: state.isVerified,
+    token: state.token,
+    logout: state.logout,
+  }));
   const segments = useSegments();
   const router = useRouter();
 
   useEffect(() => {
-    const inAuthGroup = segments[0] === '(auth)';
+    // 1. Token süresi kontrolü — süresi geçmişse sessizce çıkış yap
+    if (isAuthenticated && token && isTokenExpired(token)) {
+      console.log('[RootLayout] JWT süresi dolmuş, çıkış yapılıyor...');
+      logout();
+      return; // logout store'u günceller → useEffect tekrar tetiklenir
+    }
+
+    const inAuthGroup  = segments[0] === '(auth)';
     const isVerifyScreen = segments[1] === 'verify';
-    
-    console.log("[RootLayout] Auth Durumu:", { isAuthenticated, isVerified, inAuthGroup, isVerifyScreen, segments });
 
     if (!isAuthenticated) {
       if (!inAuthGroup) {
-        console.log("[RootLayout] Giriş yapılmamış, Login'e yönlendiriliyor...");
-        setTimeout(() => {
-          router.replace('/(auth)/login');
-        }, 1);
+        setTimeout(() => { router.replace('/(auth)/login'); }, 1);
       }
     } else {
-      // Giriş yapılmış
       if (!isVerified) {
-        // Doğrulanmamış kullanıcı sadece (auth)/verify ekranında kalabilir
         if (!inAuthGroup || !isVerifyScreen) {
-          console.log("[RootLayout] Giriş yapılmış ama doğrulanmamış. Doğrulama ekranına yönlendiriliyor...");
           setTimeout(() => {
             const email = useAuthStore.getState().email || '';
             router.replace({ pathname: '/(auth)/verify', params: { email } });
           }, 1);
         }
       } else {
-        // Doğrulanmış kullanıcı - (auth) grubundaysa tabs'e yönlendir
         if (inAuthGroup) {
-          console.log("[RootLayout] Giriş yapılmış ve doğrulanmış. Dashboard'a yönlendiriliyor...");
-          setTimeout(() => {
-            router.replace('/(tabs)');
-          }, 1);
+          setTimeout(() => { router.replace('/(tabs)'); }, 1);
         }
       }
     }
-  }, [isAuthenticated, isVerified, segments]);
+  }, [isAuthenticated, isVerified, token, segments]);
+
 
   return (
     <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>

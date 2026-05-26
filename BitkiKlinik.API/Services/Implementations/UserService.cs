@@ -26,6 +26,19 @@ public class UserService : GenericService<Users>, IUserService
         return await _context.Set<Users>().FirstOrDefaultAsync(u => u.Email == email && u.IsActive);
     }
 
+    /// <summary>
+    /// Token değerini ve son kullanma tarihini tek sorguda doğrular.
+    /// Pasif kullanıcılar dahil edilmez.
+    /// </summary>
+    public async Task<Users?> GetByRefreshTokenAsync(string refreshToken)
+    {
+        return await _context.Set<Users>()
+            .FirstOrDefaultAsync(u =>
+                u.RefreshToken == refreshToken &&
+                u.RefreshTokenExpiry > DateTime.UtcNow &&
+                u.IsActive);
+    }
+
     public async Task<Users> CreateUserAsync(Users user)
     {
         // 1. Email ve Username benzersizlik kontrolü
@@ -78,3 +91,4 @@ public class UserService : GenericService<Users>, IUserService
         return await _context.Set<Users>().Where(u => u.IsActive).ToListAsync();
     }
 }
+
