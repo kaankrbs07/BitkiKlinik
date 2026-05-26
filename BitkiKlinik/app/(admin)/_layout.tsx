@@ -1,5 +1,6 @@
 import { Stack, useRouter } from 'expo-router';
 import React, { useEffect } from 'react';
+import { useShallow } from 'zustand/react/shallow';
 import { useAuthStore } from '../../store/useAuthStore';
 
 /**
@@ -8,16 +9,16 @@ import { useAuthStore } from '../../store/useAuthStore';
  * Admin olmayan kullanıcılar otomatik olarak ana ekrana yönlendirilir.
  */
 export default function AdminLayout() {
-  const { isAdmin, isAuthenticated } = useAuthStore();
+  const { isAdmin, isAuthenticated } = useAuthStore(
+    useShallow((state) => ({ isAdmin: state.isAdmin, isAuthenticated: state.isAuthenticated }))
+  );
   const router = useRouter();
 
   // ── Route Guard: Admin değilse geri gönder ─────────────────────
   useEffect(() => {
     if (!isAuthenticated || !isAdmin) {
       console.log('[AdminLayout] Yetkisiz erişim, yönlendiriliyor...');
-      setTimeout(() => {
-        router.replace('/(tabs)');
-      }, 1);
+      router.replace('/(tabs)');
     }
   }, [isAdmin, isAuthenticated]);
 

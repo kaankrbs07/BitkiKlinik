@@ -4,6 +4,7 @@ import { StatusBar } from 'expo-status-bar';
 import 'react-native-reanimated';
 import { useEffect } from 'react';
 import { jwtDecode } from 'jwt-decode';
+import { useShallow } from 'zustand/react/shallow';
 
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useAuthStore } from '../store/useAuthStore';
@@ -25,12 +26,14 @@ function isTokenExpired(token: string): boolean {
 
 export default function RootLayout() {
   const colorScheme = useColorScheme();
-  const { isAuthenticated, isVerified, token, logout } = useAuthStore((state) => ({
-    isAuthenticated: state.isAuthenticated,
-    isVerified: state.isVerified,
-    token: state.token,
-    logout: state.logout,
-  }));
+  const { isAuthenticated, isVerified, token, logout } = useAuthStore(
+    useShallow((state) => ({
+      isAuthenticated: state.isAuthenticated,
+      isVerified: state.isVerified,
+      token: state.token,
+      logout: state.logout,
+    }))
+  );
   const segments = useSegments();
   const router = useRouter();
 
@@ -47,19 +50,17 @@ export default function RootLayout() {
 
     if (!isAuthenticated) {
       if (!inAuthGroup) {
-        setTimeout(() => { router.replace('/(auth)/login'); }, 1);
+        router.replace('/(auth)/login');
       }
     } else {
       if (!isVerified) {
         if (!inAuthGroup || !isVerifyScreen) {
-          setTimeout(() => {
-            const email = useAuthStore.getState().email || '';
-            router.replace({ pathname: '/(auth)/verify', params: { email } });
-          }, 1);
+          const email = useAuthStore.getState().email || '';
+          router.replace({ pathname: '/(auth)/verify', params: { email } });
         }
       } else {
         if (inAuthGroup) {
-          setTimeout(() => { router.replace('/(tabs)'); }, 1);
+          router.replace('/(tabs)');
         }
       }
     }
