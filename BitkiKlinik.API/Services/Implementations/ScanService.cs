@@ -30,4 +30,10 @@ public class ScanService : IScanService
 
         return scan;
     }
+
+    /// <inheritdoc />
+    public async Task<PlantScan?> GetScanByIdAsync(int scanId)
+    {
+        return await _context.PlantScans.FindAsync(scanId);
+    }
 }

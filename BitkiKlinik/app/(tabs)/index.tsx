@@ -1,4 +1,4 @@
-import React, { useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { 
   View, 
   Text, 
@@ -14,6 +14,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
+import { useFocusEffect } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 import Animated, { 
   FadeInDown, 
@@ -25,6 +26,8 @@ import { useDashboardData, RecentScan } from '../../hooks/useDashboardData';
 import { useProfile } from '../../hooks/useProfile';
 import { CONFIG } from '../../constants/config';
 import { CARE_TIPS } from '../../constants/care-data';
+import { API_ROUTES } from '../../constants/api-routes';
+import { dotnetClient } from '../../api/client';
 
 const { width } = Dimensions.get('window');
 
@@ -313,6 +316,69 @@ function HistorySection({ recentScans, isLoading, error, onRefresh, onSeeAllPres
 }
 
 // ============================================================================
+// AI CHAT SECTION COMPONENT
+// ============================================================================
+interface AIChatHistorySectionProps {
+  sessions: any[];
+  isLoading: boolean;
+  onSeeAllPress: () => void;
+  onSessionPress: (scanId: any) => void;
+}
+
+function AIChatHistorySection({ sessions, isLoading, onSeeAllPress, onSessionPress }: AIChatHistorySectionProps) {
+  if (!isLoading && sessions.length === 0) return null; // Sohbet yoksa gösterme
+
+  return (
+    <View>
+      <View style={styles.sectionHeader}>
+        <Text style={styles.sectionTitle}>Yapay Zeka Sohbetlerim</Text>
+        <TouchableOpacity onPress={onSeeAllPress} activeOpacity={0.7}>
+          <Text style={styles.seeMore}>Tümünü Gör</Text>
+        </TouchableOpacity>
+      </View>
+
+      <View style={styles.historyContainer}>
+        {isLoading && (
+          <ActivityIndicator color={COLORS.emerald} style={{ marginTop: 10, marginBottom: 10 }} />
+        )}
+
+        {!isLoading && sessions.map((item, index) => {
+          const isGeneral = item.scanId === null;
+          return (
+            <Animated.View 
+              key={item.scanId ? `scan-${item.scanId}` : 'general'} 
+              entering={FadeInDown.delay(600 + index * 100).duration(800)}
+            >
+              <TouchableOpacity 
+                style={styles.chatHistoryCard} 
+                activeOpacity={0.8}
+                onPress={() => onSessionPress(item.scanId)}
+              >
+                <View style={[
+                  styles.chatHistoryIcon, 
+                  { backgroundColor: isGeneral ? COLORS.emeraldLight : (item.isHealthy ? COLORS.emeraldLight : COLORS.dangerLight) }
+                ]}>
+                  <Ionicons 
+                    name={isGeneral ? "chatbubbles" : (item.isHealthy ? "checkmark-circle" : "alert-circle")} 
+                    size={20} 
+                    color={isGeneral ? COLORS.emerald : (item.isHealthy ? COLORS.emerald : COLORS.danger)} 
+                  />
+                </View>
+                <View style={styles.historyDetails}>
+                  <Text style={styles.historyName}>{item.plantName}</Text>
+                  <Text style={styles.chatLastMsg} numberOfLines={1}>{item.lastMessage}</Text>
+                </View>
+                <Ionicons name="chevron-forward" size={16} color={COLORS.slateLight} />
+              </TouchableOpacity>
+            </Animated.View>
+          );
+        })}
+      </View>
+    </View>
+  );
+}
+
+// ============================================================================
 // MAIN HOMESCREEN COMPONENT
 // ============================================================================
 export default function HomeScreen() {
@@ -321,12 +387,39 @@ export default function HomeScreen() {
   const { stats, recentScans, isLoading, error, refresh } = useDashboardData();
   const { fetchProfile } = useProfile();
 
-  // Profil resmini ilk açılışta çekmek ve global store ile senkronize etmek için trigger
+  const [recentChats, setRecentChats] = useState<any[]>([]);
+  const [isChatsLoading, setIsChatsLoading] = useState(true);
+
+  const fetchRecentChats = useCallback(async () => {
+    try {
+      const response = await dotnetClient.get(API_ROUTES.CHAT_SESSIONS);
+      setRecentChats(response.data.slice(0, 3)); // Sadece son 3 sohbeti göster
+    } catch (err) {
+      console.error("Ana sayfa sohbetleri yüklenemedi:", err);
+    } finally {
+      setIsChatsLoading(false);
+    }
+  }, []);
+
+  // Profil resmini ve sohbetleri ilk açılışta ve sekme odaklandığında çek
   useEffect(() => {
     if (isAuthenticated) {
       fetchProfile();
     }
   }, [isAuthenticated, fetchProfile]);
+
+  useFocusEffect(
+    useCallback(() => {
+      if (isAuthenticated) {
+        fetchRecentChats();
+      }
+    }, [isAuthenticated, fetchRecentChats])
+  );
+
+  const handleRefresh = useCallback(() => {
+    refresh();
+    fetchRecentChats();
+  }, [refresh, fetchRecentChats]);
 
   const handleLogout = useCallback(() => {
     logout();
@@ -343,7 +436,7 @@ export default function HomeScreen() {
           refreshControl={
             <RefreshControl
               refreshing={isLoading}
-              onRefresh={refresh}
+              onRefresh={handleRefresh}
               tintColor={COLORS.emerald}
               colors={[COLORS.emerald]}
             />
@@ -376,12 +469,12 @@ export default function HomeScreen() {
           {/* 5. Modüler İpuçları Listesi */}
           <TipsSection />
 
-          {/* 6. Modüler Son Teşhisler Geçmişi */}
+          {/* 7. Modüler Son Teşhisler Geçmişi */}
           <HistorySection 
             recentScans={recentScans}
             isLoading={isLoading}
             error={error}
-            onRefresh={refresh}
+            onRefresh={handleRefresh}
             onSeeAllPress={() => router.push({ pathname: '/(tabs)/explore', params: { tab: 'history' } })}
           />
 
@@ -684,5 +777,32 @@ const styles = StyleSheet.create({
     fontSize: 15,
     fontWeight: '700',
     flex: 1,
+  },
+  chatHistoryCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: COLORS.white,
+    padding: 14,
+    borderRadius: 20,
+    marginBottom: 10,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.01,
+    shadowRadius: 5,
+    elevation: 1,
+  },
+  chatHistoryIcon: {
+    width: 44,
+    height: 44,
+    borderRadius: 12,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 12,
+  },
+  chatLastMsg: {
+    fontSize: 12,
+    color: COLORS.slateLight,
+    marginTop: 2,
+    maxWidth: width * 0.65,
   },
 });

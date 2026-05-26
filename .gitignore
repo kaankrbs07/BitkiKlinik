@@ -1,37 +1,84 @@
-# IDE / Editor folders
+# ==========================================
+# BitkiKlinik Projesi Kapsamlı .gitignore
+# ==========================================
+
+# ── 1. İŞLETİM SİSTEMİ DOSYALARI (OS Files) ──
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+.DS_Store
+*.har
+
+# ── 2. EDİTÖR VE IDE DOSYALARI (IDEs & Editors) ──
 .idea/
 .vscode/
 *.suo
 *.user
 *.userosscache
 *.sln.docstates
+*.swp
+*.swo
+.project
+.classpath
+.settings/
+.visualstudio/
+out/
 
-# OS files
-Thumbs.db
-ehthumbs.db
-Desktop.ini
-.DS_Store
+# ── 3. .NET BACKEND GÜVENLİK VE DERLEME (C# / .NET API) ──
+**/bin/
+**/obj/
+**/App_Data/*.ldf
+**/App_Data/*.mdf
+**/wwwroot/uploads/*
+!**/wwwroot/uploads/.gitkeep
+**/appsettings.json
+**/appsettings.Development.json
+*.db
+*.sqlite
 
-# Expo / React Native App (BitkiKlinik)
-BitkiKlinik/node_modules/
-BitkiKlinik/.expo/
-BitkiKlinik/dist/
-BitkiKlinik/web-build/
-BitkiKlinik/npm-debug.*
-BitkiKlinik/yarn-debug.*
-BitkiKlinik/yarn-error.*
-BitkiKlinik/.env*.local
+# ── 4. REACT NATIVE & EXPO MOBİL UYGULAMA (Frontend App) ──
+**/node_modules/
+**/.expo/
+**/dist/
+**/web-build/
+**/npm-debug.*
+**/yarn-debug.*
+**/yarn-error.*
+**/.env*.local
+**/.env
+**/.kotlin/
+**/*.orig.*
+**/*.jks
+**/*.p8
+**/*.p12
+**/*.key
+**/*.mobileprovision
+**/.metro-health-check*
+**/*.tsbuildinfo
+**/ios/
+**/android/
 
-# .NET Backend (BitkiKlinik.API)
-BitkiKlinik.API/bin/
-BitkiKlinik.API/obj/
-BitkiKlinik.API/wwwroot/uploads/
-
-# Python ML (BitkiKlinik.ML)
-BitkiKlinik.ML/venv/
-BitkiKlinik.ML/__pycache__/
-BitkiKlinik.ML/*.pyc
-BitkiKlinik.ML/.ipynb_checkpoints/
-BitkiKlinik.ML/data/
-BitkiKlinik.ML/outputs/
-BitkiKlinik.ML/Dependencies.zip
+# ── 5. PYTHON VE ML SERVİSİ (Python / Machine Learning) ──
+**/venv/
+**/.venv/
+**/env/
+**/ENV/
+**/__pycache__/
+**/*.pyc
+**/*.pyo
+**/*.pyd
+**/.ipynb_checkpoints/
+**/.pytest_cache/
+**/.tox/
+**/.coverage
+**/htmlcov/
+**/*.log
+**/BitkiKlinik.ML/data/*
+!**/BitkiKlinik.ML/data/.gitkeep
+**/BitkiKlinik.ML/outputs/*
+!**/BitkiKlinik.ML/outputs/.gitkeep
+**/BitkiKlinik.ML/models/*.h5
+**/BitkiKlinik.ML/models/*.pkl
+**/BitkiKlinik.ML/models/*.pt
+**/BitkiKlinik.ML/models/*.onnx
+**/BitkiKlinik.ML/Dependencies.zip

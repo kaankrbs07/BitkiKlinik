@@ -48,6 +48,7 @@ builder.Services.AddScoped<IDashboardService, DashboardService>();
 builder.Services.AddScoped<IScanService, ScanService>();
 builder.Services.AddScoped<IAdminDiseaseService, AdminDiseaseService>();
 builder.Services.AddScoped<IActiveLearningService, ActiveLearningService>();
+builder.Services.AddScoped<IGeminiService, GeminiService>();
 
 builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
     .AddJwtBearer(options =>

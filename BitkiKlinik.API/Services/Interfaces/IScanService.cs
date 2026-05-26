@@ -12,4 +12,9 @@ public interface IScanService
     /// Yeni bir tarama kaydını veritabanına ekler.
     /// </summary>
     Task<PlantScan> SaveScanAsync(PlantScan scan);
+
+    /// <summary>
+    /// ID değerine göre bir tarama kaydını veritabanından getirir.
+    /// </summary>
+    Task<PlantScan?> GetScanByIdAsync(int scanId);
 }

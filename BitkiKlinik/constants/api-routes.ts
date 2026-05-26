@@ -17,6 +17,14 @@ export const API_ROUTES = {
   DISEASE_BY_NAME:   (name: string) => `/Diseases/by-name/${encodeURIComponent(name)}`,
   FLAG_SCAN:         (id: number)   => `/Diseases/flag-scan/${id}`,
   HISTORY:           '/Diseases/history',
+  CHAT:              '/Chat',
+  CHAT_HISTORY:      (sessionId?: string, scanId?: string) => {
+    const params: string[] = [];
+    if (sessionId) params.push(`sessionId=${sessionId}`);
+    if (scanId) params.push(`scanId=${scanId}`);
+    return `/Chat/history${params.length ? '?' + params.join('&') : ''}`;
+  },
+  CHAT_SESSIONS:     '/Chat/sessions',
 
   // Profile / Users
   MY_PROFILE:          '/Users/me',

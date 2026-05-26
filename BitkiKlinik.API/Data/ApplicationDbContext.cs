@@ -14,6 +14,7 @@ public class ApplicationDbContext : DbContext
     public DbSet<DiseaseTreatment> DiseaseTreatments { get; set; } = null!;
     public DbSet<PlantScan> PlantScans { get; set; } = null!;
     public DbSet<ActiveLearningQueue> ActiveLearningQueue { get; set; } = null!;
+    public DbSet<ChatMessage> ChatMessages { get; set; } = null!;
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -106,6 +107,26 @@ public class ApplicationDbContext : DbContext
                   .OnDelete(DeleteBehavior.SetNull);
             entity.HasIndex(e => e.Status);
             entity.HasIndex(e => e.CreatedAt);
+        });
+
+        // ── ChatMessage configuration ─────────────────────────────────────────
+        modelBuilder.Entity<ChatMessage>(entity =>
+        {
+            entity.ToTable("ChatMessages");
+            entity.HasKey(c => c.Id);
+            entity.Property(c => c.Role).IsRequired().HasMaxLength(50);
+            entity.Property(c => c.Content).IsRequired();
+            entity.Property(c => c.SessionId).IsRequired().HasMaxLength(100).HasDefaultValue("");
+            
+            entity.HasOne(c => c.User)
+                  .WithMany()
+                  .HasForeignKey(c => c.UserId)
+                  .OnDelete(DeleteBehavior.Cascade);
+
+            entity.HasOne(c => c.Scan)
+                  .WithMany()
+                  .HasForeignKey(c => c.ScanId)
+                  .OnDelete(DeleteBehavior.Restrict);
         });
     }
 }

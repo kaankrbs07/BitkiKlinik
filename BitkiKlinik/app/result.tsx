@@ -112,6 +112,17 @@ export default function ResultScreen() {
           </View>
           <Text style={styles.diseaseDescription}>{data.disease.description}</Text>
           
+          <TouchableOpacity 
+            style={styles.chatButton} 
+            onPress={() => router.push({ 
+              pathname: '/chat', 
+              params: { scanId: data.scanId ? String(data.scanId) : '' } 
+            })}
+          >
+            <Ionicons name="chatbubble-ellipses-outline" size={18} color="white" style={{marginRight: 6}} />
+            <Text style={styles.chatButtonText}>Yapay Zeka Hekimine Danış</Text>
+          </TouchableOpacity>
+
           {data.scanId && (
             <TouchableOpacity 
               style={[styles.flagButton, isFlagged && styles.flagButtonActive]} 
@@ -433,5 +444,25 @@ const styles = StyleSheet.create({
   },
   flagButtonTextActive: {
     color: '#777',
+  },
+  chatButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: 16,
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    borderRadius: 10,
+    backgroundColor: '#10b981',
+    shadowColor: '#10b981',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.15,
+    shadowRadius: 4,
+    elevation: 2,
+  },
+  chatButtonText: {
+    fontSize: 14,
+    fontWeight: 'bold',
+    color: 'white',
   }
 });
