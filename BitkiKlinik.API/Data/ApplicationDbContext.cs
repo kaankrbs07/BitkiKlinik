@@ -15,6 +15,7 @@ public class ApplicationDbContext : DbContext
     public DbSet<PlantScan> PlantScans { get; set; } = null!;
     public DbSet<ActiveLearningQueue> ActiveLearningQueue { get; set; } = null!;
     public DbSet<ChatMessage> ChatMessages { get; set; } = null!;
+    public DbSet<DiseaseRiskAlert> DiseaseRiskAlerts { get; set; } = null!;
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -27,6 +28,7 @@ public class ApplicationDbContext : DbContext
         modelBuilder.Entity<DiseaseTreatment>().ToTable("DiseaseTreatments");
         modelBuilder.Entity<PlantScan>().ToTable("PlantScans");
         modelBuilder.Entity<ActiveLearningQueue>().ToTable("ActiveLearningQueue");
+        modelBuilder.Entity<DiseaseRiskAlert>().ToTable("DiseaseRiskAlerts");
 
         // ── Treatment: store TreatmentType enum as an integer column ─────────
         modelBuilder.Entity<Treatment>(entity =>
@@ -127,6 +129,20 @@ public class ApplicationDbContext : DbContext
                   .WithMany()
                   .HasForeignKey(c => c.ScanId)
                   .OnDelete(DeleteBehavior.Restrict);
+        });
+
+        // ── DiseaseRiskAlert configuration ───────────────────────────────────
+        modelBuilder.Entity<DiseaseRiskAlert>(entity =>
+        {
+            entity.HasKey(dra => dra.Id);
+            entity.Property(dra => dra.DiseaseName).IsRequired().HasMaxLength(200);
+            entity.Property(dra => dra.RiskLevel).IsRequired().HasMaxLength(50);
+            entity.Property(dra => dra.Suggestion).IsRequired().HasMaxLength(1000);
+
+            entity.HasOne(dra => dra.User)
+                  .WithMany()
+                  .HasForeignKey(dra => dra.UserId)
+                  .OnDelete(DeleteBehavior.Cascade);
         });
     }
 }

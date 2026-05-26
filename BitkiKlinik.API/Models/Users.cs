@@ -16,6 +16,11 @@ public class Users
     public UserRole Role { get; set; } = UserRole.User;
     public string? ProfilePictureUrl { get; set; }
 
+    // ── Agricultural & Push Notification Fields ──────────────────
+    public double? Latitude { get; set; }
+    public double? Longitude { get; set; }
+    public string? ExpoPushToken { get; set; }
+
     // ── Refresh Token ─────────────────────────────────────────────
     public string? RefreshToken { get; set; }
     public DateTime? RefreshTokenExpiry { get; set; }

@@ -10,12 +10,16 @@ import {
   Platform,
   StatusBar,
   RefreshControl,
-  Image
+  Image,
+  Modal
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+
+let hasAskedLocationThisSession = false;
 import { useRouter } from 'expo-router';
 import { useFocusEffect } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
+import * as Location from 'expo-location';
 import Animated, { 
   FadeInDown, 
   FadeInRight, 
@@ -379,6 +383,137 @@ function AIChatHistorySection({ sessions, isLoading, onSeeAllPress, onSessionPre
 }
 
 // ============================================================================
+// WEATHER & DISEASE RISK FORECASTING SECTION
+// ============================================================================
+interface WeatherDiseaseRiskSectionProps {
+  riskAlert: {
+    diseaseName: string;
+    riskPercentage: number;
+    riskLevel: string;
+    suggestion: string;
+    calculatedAt: string;
+  } | null;
+  isLoading: boolean;
+  locationGranted: boolean | null;
+  onRequestLocation: () => void;
+}
+
+function WeatherDiseaseRiskSection({ riskAlert, isLoading, locationGranted, onRequestLocation }: WeatherDiseaseRiskSectionProps) {
+  if (locationGranted === false) {
+    return (
+      <Animated.View entering={FadeInDown.delay(300).duration(800)} style={styles.riskCardContainer}>
+        <View style={[styles.riskCard, { backgroundColor: '#fffbeb', borderColor: '#fef3c7', borderWidth: 1 }]}>
+          <View style={styles.riskHeader}>
+            <View style={[styles.riskIconBg, { backgroundColor: 'rgba(217, 119, 6, 0.1)' }]}>
+              <Ionicons name="location-outline" size={24} color="#d97706" />
+            </View>
+            <View style={{ flex: 1, marginLeft: 12 }}>
+              <Text style={[styles.riskTitle, { color: COLORS.slate }]}>Konum Bazlı Tahmin</Text>
+              <Text style={styles.riskSubtitle}>Mantar hastalık riski analizi için GPS izni gereklidir.</Text>
+            </View>
+          </View>
+          <TouchableOpacity 
+            style={[styles.riskButton, { backgroundColor: COLORS.emerald }]} 
+            onPress={onRequestLocation} 
+            activeOpacity={0.85}
+          >
+            <Ionicons name="map-outline" size={18} color="#fff" style={{ marginRight: 6 }} />
+            <Text style={styles.riskButtonText}>Konum İzni Ver</Text>
+          </TouchableOpacity>
+        </View>
+      </Animated.View>
+    );
+  }
+
+  if (isLoading) {
+    return (
+      <View style={styles.riskLoaderContainer}>
+        <ActivityIndicator color={COLORS.emerald} size="small" />
+        <Text style={styles.riskLoaderText}>Tarımsal hastalık riski hesaplanıyor...</Text>
+      </View>
+    );
+  }
+
+  if (!riskAlert) return null;
+
+  const getRiskColor = (level: string) => {
+    switch (level) {
+      case 'Kritik': return COLORS.danger;
+      case 'Orta': return COLORS.warning;
+      default: return COLORS.emerald;
+    }
+  };
+
+  const getRiskBg = (level: string) => {
+    switch (level) {
+      case 'Kritik': return '#fef2f2';
+      case 'Orta': return '#fffbeb';
+      default: return '#f0fdf4';
+    }
+  };
+
+  const getRiskBorder = (level: string) => {
+    switch (level) {
+      case 'Kritik': return '#fee2e2';
+      case 'Orta': return '#fef3c7';
+      default: return '#dcfce7';
+    }
+  };
+
+  const getRiskIcon = (level: string) => {
+    switch (level) {
+      case 'Kritik': return 'alert-circle';
+      case 'Orta': return 'warning';
+      default: return 'shield-checkmark';
+    }
+  };
+
+  const riskColor = getRiskColor(riskAlert.riskLevel);
+  const cardBg = getRiskBg(riskAlert.riskLevel);
+  const cardBorder = getRiskBorder(riskAlert.riskLevel);
+  const riskIcon = getRiskIcon(riskAlert.riskLevel);
+
+  return (
+    <Animated.View entering={FadeInDown.delay(300).duration(800)} style={styles.riskCardContainer}>
+      <View style={[styles.riskCard, { backgroundColor: cardBg, borderColor: cardBorder, borderWidth: 1 }]}>
+        <View style={styles.riskHeader}>
+          <View style={[styles.riskIconBg, { backgroundColor: `${riskColor}15` }]}>
+            <Ionicons name={riskIcon} size={24} color={riskColor} />
+          </View>
+          <View style={{ flex: 1, marginLeft: 12 }}>
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+              <Text style={[styles.riskTitle, { color: COLORS.slate }]}>Tarımsal Sağlık Tahmini</Text>
+              <Text style={[styles.riskLevelBadge, { color: riskColor, backgroundColor: `${riskColor}15` }]}>
+                {riskAlert.riskLevel}
+              </Text>
+            </View>
+            <Text style={styles.riskSubtitle}>{riskAlert.diseaseName} Riski</Text>
+          </View>
+        </View>
+
+        {/* Linear Progress Bar */}
+        <View style={styles.progressBarContainer}>
+          <View style={styles.progressBarBg}>
+            <View style={[styles.progressBarFill, { width: `${Math.max(riskAlert.riskPercentage, 5)}%`, backgroundColor: riskColor }]} />
+          </View>
+          <View style={styles.progressLabels}>
+            <Text style={styles.progressPercentage}>Smith Periyodu Riski: %{riskAlert.riskPercentage}</Text>
+            <Text style={styles.calculatedTime}>
+              {new Date(riskAlert.calculatedAt).toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' })} güncellendi
+            </Text>
+          </View>
+        </View>
+
+        <View style={styles.suggestionContainer}>
+          <Ionicons name="information-circle-outline" size={16} color={COLORS.slateLight} style={{ marginRight: 6, marginTop: 2 }} />
+          <Text style={styles.suggestionText}>{riskAlert.suggestion}</Text>
+        </View>
+      </View>
+    </Animated.View>
+  );
+}
+
+// ============================================================================
 // MAIN HOMESCREEN COMPONENT
 // ============================================================================
 export default function HomeScreen() {
@@ -389,6 +524,109 @@ export default function HomeScreen() {
 
   const [recentChats, setRecentChats] = useState<any[]>([]);
   const [isChatsLoading, setIsChatsLoading] = useState(true);
+
+  // Tarımsal tahmin durumları
+  const [riskAlert, setRiskAlert] = useState<any>(null);
+  const [isRiskLoading, setIsRiskLoading] = useState(true);
+  const [locationGranted, setLocationGranted] = useState<boolean | null>(null);
+  const [showLocationModal, setShowLocationModal] = useState(false);
+
+  const fetchRiskAndCoordinates = useCallback(async (forceRequest: boolean = false) => {
+    try {
+      setIsRiskLoading(true);
+      
+      // Önce mevcut izin durumunu kontrol et
+      const { status: existingStatus } = await Location.getForegroundPermissionsAsync();
+      let finalStatus = existingStatus;
+
+      // Eğer izin verilmemişse ve zorlanıyorsa izin iste
+      if (existingStatus !== 'granted' && forceRequest) {
+        const { status } = await Location.requestForegroundPermissionsAsync();
+        finalStatus = status;
+      }
+
+      if (finalStatus !== 'granted') {
+        setLocationGranted(false);
+        setIsRiskLoading(false);
+        
+        // İzin yoksa veritabanındaki son riski getirelim
+        try {
+          const response = await dotnetClient.get(API_ROUTES.LATEST_RISK_ALERT);
+          setRiskAlert(response.data);
+
+          // EĞER veritabanında henüz hesaplanmış bir risk yoksa (kullanıcı ilk kez giriş yapmışsa ve konumu yoksa)
+          // ve bu oturumda henüz sormadıysak, konum açıklama modalını gösterelim!
+          const isDefaultAlert = response.data?.suggestion?.includes("Konumunuz güncellendiğinde") || !response.data?.calculatedAt;
+          if (isDefaultAlert && !hasAskedLocationThisSession) {
+            hasAskedLocationThisSession = true;
+            setShowLocationModal(true);
+          }
+        } catch (err) {
+          console.error("Hastalık riski çekilemedi (konumsuz):", err);
+          if (!hasAskedLocationThisSession) {
+            hasAskedLocationThisSession = true;
+            setShowLocationModal(true);
+          }
+        }
+        return;
+      }
+
+      // EĞER izin verilmişse, ama Expo Go gibi geliştirme ortamlarında veya ilk kez alınıyorsa,
+      // ve forceRequest false ise:
+      // Expo Go'nun otomatik olarak uyarı çıkarmasını önlemek için, eğer kullanıcının veritabanında konumu yoksa,
+      // ve biz daha önce bu oturumda sormadıysak, izni doğrudan sorgulamadan önce modalı gösterelim.
+      if (finalStatus === 'granted' && !forceRequest) {
+        try {
+          const response = await dotnetClient.get(API_ROUTES.LATEST_RISK_ALERT);
+          setRiskAlert(response.data);
+          
+          const isDefaultAlert = response.data?.suggestion?.includes("Konumunuz güncellendiğinde") || !response.data?.calculatedAt;
+          if (isDefaultAlert) {
+            setLocationGranted(false);
+            setIsRiskLoading(false);
+            if (!hasAskedLocationThisSession) {
+              hasAskedLocationThisSession = true;
+              setShowLocationModal(true);
+            }
+            return; // Durdur, kullanıcı modalda "İzin Ver" diyene kadar getCurrentPositionAsync() çağırma!
+          }
+        } catch (err) {
+          console.error("Hastalık riski kontrolü başarısız:", err);
+        }
+      }
+
+      setLocationGranted(true);
+
+      // Konum bilgisini al
+      const location = await Location.getCurrentPositionAsync({ 
+        accuracy: Location.Accuracy.Balanced 
+      });
+
+      const { latitude, longitude } = location.coords;
+
+      // Konumu sunucuya güncelle
+      const response = await dotnetClient.post(API_ROUTES.UPDATE_LOCATION, {
+        latitude,
+        longitude,
+        expoPushToken: ""
+      });
+
+      if (response.data?.latestRisk) {
+        setRiskAlert(response.data.latestRisk);
+      } else {
+        const riskResponse = await dotnetClient.get(API_ROUTES.LATEST_RISK_ALERT);
+        setRiskAlert(riskResponse.data);
+      }
+    } catch (err) {
+      console.error("Konum ve tarımsal risk güncelleme hatası:", err);
+      try {
+        const response = await dotnetClient.get(API_ROUTES.LATEST_RISK_ALERT);
+        setRiskAlert(response.data);
+      } catch {}
+    } finally {
+      setIsRiskLoading(false);
+    }
+  }, []);
 
   const fetchRecentChats = useCallback(async () => {
     try {
@@ -405,21 +643,24 @@ export default function HomeScreen() {
   useEffect(() => {
     if (isAuthenticated) {
       fetchProfile();
+      fetchRiskAndCoordinates(false); // İlk açılışta izin istemeden kontrol et
     }
-  }, [isAuthenticated, fetchProfile]);
+  }, [isAuthenticated, fetchProfile, fetchRiskAndCoordinates]);
 
   useFocusEffect(
     useCallback(() => {
       if (isAuthenticated) {
         fetchRecentChats();
+        fetchRiskAndCoordinates(false); // Sekme odaklandığında da arka planda güncelle
       }
-    }, [isAuthenticated, fetchRecentChats])
+    }, [isAuthenticated, fetchRecentChats, fetchRiskAndCoordinates])
   );
 
   const handleRefresh = useCallback(() => {
     refresh();
     fetchRecentChats();
-  }, [refresh, fetchRecentChats]);
+    fetchRiskAndCoordinates(false);
+  }, [refresh, fetchRecentChats, fetchRiskAndCoordinates]);
 
   const handleLogout = useCallback(() => {
     logout();
@@ -429,6 +670,77 @@ export default function HomeScreen() {
   return (
     <View style={styles.container}>
       <StatusBar barStyle="dark-content" />
+
+      {/* Premium Onboarding / Konum İzni Açıklama Modalı */}
+      <Modal
+        visible={showLocationModal}
+        transparent={true}
+        animationType="fade"
+        onRequestClose={() => setShowLocationModal(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <Animated.View entering={FadeInDown.duration(400)} style={styles.permissionModalContent}>
+            {/* Üst Kısım / Görsel ve İkon */}
+            <View style={styles.modalHeaderImageBg}>
+              <View style={styles.modalIconRing}>
+                <Ionicons name="location" size={40} color={COLORS.emerald} />
+              </View>
+              {/* Dekoratif Yapraklar */}
+              <Ionicons name="leaf" size={100} color="rgba(16, 185, 129, 0.05)" style={styles.decorLeafLeft} />
+              <Ionicons name="leaf" size={80} color="rgba(16, 185, 129, 0.05)" style={styles.decorLeafRight} />
+            </View>
+
+            {/* İçerik */}
+            <View style={styles.modalBody}>
+              <Text style={styles.modalTitle}>Tarımsal Sağlık Tahmini</Text>
+              <Text style={styles.modalSubtitle}>Kritik Hastalık Risklerini Kaçırmayın</Text>
+              
+              <Text style={styles.modalDescription}>
+                BitkiKlinik, tarlanızdaki ve bölgenizdeki mantar hastalığı (Mildiyö) riskini hava durumuna göre otomatik olarak analiz eder.
+              </Text>
+
+              <View style={styles.infoFeatureList}>
+                <View style={styles.infoFeatureItem}>
+                  <Ionicons name="sunny-outline" size={20} color={COLORS.emerald} />
+                  <Text style={styles.infoFeatureText}>Saatlik hava tahminleri ve nem takibi</Text>
+                </View>
+                <View style={styles.infoFeatureItem}>
+                  <Ionicons name="alert-circle-outline" size={20} color={COLORS.emerald} />
+                  <Text style={styles.infoFeatureText}>Kritik mantar riski durumunda anlık uyarılar</Text>
+                </View>
+                <View style={styles.infoFeatureItem}>
+                  <Ionicons name="shield-checkmark-outline" size={20} color={COLORS.emerald} />
+                  <Text style={styles.infoFeatureText}>Tarımsal müdahale ve koruma önerileri</Text>
+                </View>
+              </View>
+            </View>
+
+            {/* Butonlar */}
+            <View style={styles.modalFooter}>
+              <TouchableOpacity 
+                style={styles.modalPrimaryButton} 
+                onPress={() => {
+                  setShowLocationModal(false);
+                  fetchRiskAndCoordinates(true);
+                }}
+                activeOpacity={0.9}
+              >
+                <Text style={styles.modalPrimaryButtonText}>Konumu Etkinleştir</Text>
+                <Ionicons name="arrow-forward" size={16} color="#fff" style={{ marginLeft: 6 }} />
+              </TouchableOpacity>
+
+              <TouchableOpacity 
+                style={styles.modalSecondaryButton} 
+                onPress={() => setShowLocationModal(false)}
+                activeOpacity={0.7}
+              >
+                <Text style={styles.modalSecondaryButtonText}>Şimdi Değil, Daha Sonra</Text>
+              </TouchableOpacity>
+            </View>
+          </Animated.View>
+        </View>
+      </Modal>
+
       <SafeAreaView style={{ flex: 1 }}>
         <ScrollView 
           contentContainerStyle={styles.scrollContent} 
@@ -464,6 +776,14 @@ export default function HomeScreen() {
           {/* 4. Modüler AI Sağlık Taraması Kartı */}
           <MainActionSection 
             onPress={() => router.push('/(tabs)/scan')}
+          />
+
+          {/* Tarımsal Sağlık & Hastalık Risk Tahmini Kartı */}
+          <WeatherDiseaseRiskSection 
+            riskAlert={riskAlert}
+            isLoading={isRiskLoading}
+            locationGranted={locationGranted}
+            onRequestLocation={() => fetchRiskAndCoordinates(true)}
           />
 
           {/* 5. Modüler İpuçları Listesi */}
@@ -804,5 +1124,250 @@ const styles = StyleSheet.create({
     color: COLORS.slateLight,
     marginTop: 2,
     maxWidth: width * 0.65,
+  },
+  riskCardContainer: {
+    paddingHorizontal: 24,
+    marginTop: 24,
+    marginBottom: 8,
+  },
+  riskCard: {
+    borderRadius: 24,
+    padding: 20,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.02,
+    shadowRadius: 10,
+    elevation: 1,
+  },
+  riskHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  riskIconBg: {
+    width: 48,
+    height: 48,
+    borderRadius: 14,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  riskTitle: {
+    fontSize: 16,
+    fontWeight: 'bold',
+  },
+  riskSubtitle: {
+    fontSize: 13,
+    color: COLORS.slateLight,
+    marginTop: 2,
+  },
+  riskLevelBadge: {
+    fontSize: 11,
+    fontWeight: '700',
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 6,
+    overflow: 'hidden',
+  },
+  progressBarContainer: {
+    marginTop: 18,
+  },
+  progressBarBg: {
+    height: 8,
+    backgroundColor: 'rgba(0,0,0,0.05)',
+    borderRadius: 4,
+    overflow: 'hidden',
+  },
+  progressBarFill: {
+    height: '100%',
+    borderRadius: 4,
+  },
+  progressLabels: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginTop: 6,
+  },
+  progressPercentage: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: COLORS.slate,
+  },
+  calculatedTime: {
+    fontSize: 11,
+    color: COLORS.slateLight,
+  },
+  suggestionContainer: {
+    flexDirection: 'row',
+    marginTop: 14,
+    paddingTop: 14,
+    borderTopWidth: 1,
+    borderTopColor: 'rgba(0,0,0,0.04)',
+  },
+  suggestionText: {
+    flex: 1,
+    fontSize: 12.5,
+    color: COLORS.slateLight,
+    lineHeight: 18,
+  },
+  riskButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 12,
+    borderRadius: 14,
+    marginTop: 14,
+  },
+  riskButtonText: {
+    color: '#fff',
+    fontWeight: '700',
+    fontSize: 13,
+  },
+  riskLoaderContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 16,
+    marginHorizontal: 24,
+    marginTop: 24,
+    marginBottom: 8,
+    backgroundColor: COLORS.white,
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: 'rgba(0,0,0,0.02)',
+  },
+  riskLoaderText: {
+    fontSize: 12,
+    color: COLORS.slateLight,
+    marginLeft: 8,
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(15, 23, 42, 0.65)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 24,
+  },
+  permissionModalContent: {
+    backgroundColor: COLORS.white,
+    borderRadius: 32,
+    width: '100%',
+    maxWidth: 340,
+    overflow: 'hidden',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 12 },
+    shadowOpacity: 0.15,
+    shadowRadius: 24,
+    elevation: 8,
+  },
+  modalHeaderImageBg: {
+    height: 140,
+    backgroundColor: '#f0fdf4',
+    justifyContent: 'center',
+    alignItems: 'center',
+    position: 'relative',
+    overflow: 'hidden',
+  },
+  modalIconRing: {
+    width: 80,
+    height: 80,
+    borderRadius: 40,
+    backgroundColor: COLORS.white,
+    justifyContent: 'center',
+    alignItems: 'center',
+    shadowColor: COLORS.emerald,
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.15,
+    shadowRadius: 12,
+    elevation: 4,
+    zIndex: 2,
+  },
+  decorLeafLeft: {
+    position: 'absolute',
+    left: -20,
+    bottom: -10,
+    transform: [{ rotate: '45deg' }],
+  },
+  decorLeafRight: {
+    position: 'absolute',
+    right: -10,
+    top: -10,
+    transform: [{ rotate: '-30deg' }],
+  },
+  modalBody: {
+    paddingHorizontal: 24,
+    paddingTop: 24,
+    paddingBottom: 8,
+    alignItems: 'center',
+  },
+  modalTitle: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    color: COLORS.slate,
+    textAlign: 'center',
+  },
+  modalSubtitle: {
+    fontSize: 13,
+    color: COLORS.emerald,
+    fontWeight: '600',
+    marginTop: 4,
+    textAlign: 'center',
+  },
+  modalDescription: {
+    fontSize: 13,
+    color: COLORS.slateLight,
+    lineHeight: 18,
+    textAlign: 'center',
+    marginTop: 12,
+    paddingHorizontal: 8,
+  },
+  infoFeatureList: {
+    width: '100%',
+    marginTop: 20,
+    backgroundColor: '#f8fafc',
+    borderRadius: 20,
+    padding: 16,
+    gap: 12,
+  },
+  infoFeatureItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  infoFeatureText: {
+    fontSize: 12,
+    color: COLORS.slate,
+    marginLeft: 10,
+    flex: 1,
+    fontWeight: '500',
+  },
+  modalFooter: {
+    padding: 24,
+    paddingTop: 8,
+    gap: 8,
+  },
+  modalPrimaryButton: {
+    backgroundColor: COLORS.emerald,
+    borderRadius: 16,
+    paddingVertical: 14,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    shadowColor: COLORS.emerald,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.2,
+    shadowRadius: 8,
+    elevation: 3,
+  },
+  modalPrimaryButtonText: {
+    color: COLORS.white,
+    fontSize: 14,
+    fontWeight: '700',
+  },
+  modalSecondaryButton: {
+    paddingVertical: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  modalSecondaryButtonText: {
+    color: COLORS.slateLight,
+    fontSize: 13,
+    fontWeight: '600',
   },
 });

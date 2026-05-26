@@ -26,6 +26,10 @@ export const API_ROUTES = {
   },
   CHAT_SESSIONS:     '/Chat/sessions',
 
+  // Agricultural Weather & Disease Risk Forecasting
+  LATEST_RISK_ALERT:   '/DiseaseRiskAlerts/latest',
+  UPDATE_LOCATION:     '/Users/location',
+
   // Profile / Users
   MY_PROFILE:          '/Users/me',
   UPDATE_USERNAME:     '/Users/me/username',

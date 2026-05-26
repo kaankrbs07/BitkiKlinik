@@ -49,6 +49,8 @@ builder.Services.AddScoped<IScanService, ScanService>();
 builder.Services.AddScoped<IAdminDiseaseService, AdminDiseaseService>();
 builder.Services.AddScoped<IActiveLearningService, ActiveLearningService>();
 builder.Services.AddScoped<IGeminiService, GeminiService>();
+builder.Services.AddScoped<IWeatherService, WeatherService>();
+builder.Services.AddHttpClient();
 
 builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
     .AddJwtBearer(options =>
@@ -101,6 +103,7 @@ builder.Services.AddOpenApi();
 // ── Arka Plan Servisleri ───────────────────────────────────────────────────
 // Düşük güvenli geçmiş taramaları aktif öğrenme kuyruğuna taşır (Program.cs'ten ayrıldı).
 builder.Services.AddHostedService<ActiveLearningBackfillService>();
+builder.Services.AddHostedService<DiseaseRiskForecastingService>();
 
 
 var app = builder.Build();
