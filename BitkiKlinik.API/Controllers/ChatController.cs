@@ -9,6 +9,7 @@ using BitkiKlinik.API.Models;
 using BitkiKlinik.API.Services.Interfaces;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 
@@ -46,6 +47,7 @@ public class ChatController : ControllerBase
     /// Yapay Zeka Hekimi ile sohbet etmeyi sağlayan RAG (Retrieval-Augmented Generation) ve Kalıcı Sohbet Geçmişi endpoint'i.
     /// </summary>
     [HttpPost]
+    [EnableRateLimiting("ChatPolicy")]
     public async Task<IActionResult> AskAdvisor([FromBody] ChatRequestDTO request)
     {
         if (request == null || request.History == null || !request.History.Any())
@@ -227,6 +229,7 @@ public class ChatController : ControllerBase
 
     /// <summary>
     /// Kullanıcının aktif olan tüm sohbet oturumlarını gruplayarak tarih sırasına göre listeler.
+    /// Oturum başına yalnızca son mesaj çekilir (2 sorgu, tüm geçmişi belleğe almaz).
     /// </summary>
     [HttpGet("sessions")]
     public async Task<IActionResult> GetChatSessions()
@@ -235,36 +238,50 @@ public class ChatController : ControllerBase
         {
             var userId = GetCurrentUserId();
 
-            // Kullanıcının tüm sohbet mesajlarını yükle
-            var userMessages = await _context.ChatMessages
+            // Sorgu 1: Her oturum için yalnızca max tarih ve SessionId çek (hafif — navigation property yok)
+            var sessionMeta = await _context.ChatMessages
                 .Where(m => m.UserId == userId)
-                .Include(m => m.Scan)
+                .GroupBy(m => m.SessionId)
+                .Select(g => new { SessionId = g.Key, MaxDate = g.Max(m => m.CreatedDate) })
+                .OrderByDescending(s => s.MaxDate)
                 .ToListAsync();
 
-            if (!userMessages.Any())
+            if (!sessionMeta.Any())
                 return Ok(Enumerable.Empty<object>());
 
-            // Bellekte SessionId değerine göre grupla
-            var sessions = userMessages
-                .GroupBy(m => m.SessionId)
-                .Select(g =>
+            // Sorgu 2: Her oturum için korelasyonlu alt sorgu — yalnızca son mesajları döndürür
+            // SQL: WHERE CreatedDate = MAX(CreatedDate) FOR that SessionId
+            var lastMessages = await _context.ChatMessages
+                .Where(m => m.UserId == userId &&
+                            m.CreatedDate == _context.ChatMessages
+                                .Where(m2 => m2.SessionId == m.SessionId && m2.UserId == userId)
+                                .Max(m2 => m2.CreatedDate))
+                .Include(m => m.Scan)
+                .AsNoTracking()
+                .ToListAsync();
+
+            // sessionMeta sırasına göre oturumları oluştur
+            var lastMsgBySession = lastMessages.ToDictionary(m => m.SessionId);
+
+            var sessions = sessionMeta
+                .Where(s => lastMsgBySession.ContainsKey(s.SessionId))
+                .Select(s =>
                 {
-                    var lastMsg = g.OrderByDescending(m => m.CreatedDate).First();
+                    var lastMsg = lastMsgBySession[s.SessionId];
                     var scan = lastMsg.Scan;
 
                     return new
                     {
-                        SessionId = g.Key,
+                        SessionId = s.SessionId,
                         ScanId = lastMsg.ScanId,
                         PlantName = scan != null ? scan.PlantName : "Genel Danışmanlık",
                         DiseaseName = scan != null ? scan.DiseaseName : "Genel Bitki Soruları",
                         LastMessage = lastMsg.Content.Length > 80 ? lastMsg.Content.Substring(0, 80) + "..." : lastMsg.Content,
-                        LastMessageDate = lastMsg.CreatedDate,
+                        LastMessageDate = s.MaxDate,
                         IsHealthy = scan == null || scan.Status == Models.Enums.ScanStatus.Healthy,
                         ImageUrl = scan != null ? scan.ImageUrl : null
                     };
                 })
-                .OrderByDescending(s => s.LastMessageDate)
                 .ToList();
 
             return Ok(sessions);

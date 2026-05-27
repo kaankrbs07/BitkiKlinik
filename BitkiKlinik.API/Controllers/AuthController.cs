@@ -163,9 +163,11 @@ public class AuthController : ControllerBase
 
     // ── POST /api/auth/verify-email ───────────────────────────────────────
     [HttpPost("verify-email")]
+    [EnableRateLimiting("AuthPolicy")]
     public async Task<IActionResult> VerifyEmail([FromBody] UserVerifyEmailDTO verifyDto)
     {
-        var user = await _userService.GetByEmailAsync(verifyDto.Email);
+        // Pasif kullanıcılar da doğrulama yapabilmeli → IsActive filtresi uygulanmaz
+        var user = await _userService.GetByEmailForVerificationAsync(verifyDto.Email);
 
         if (user == null)
             return NotFound(new { Message = "Kullanıcı bulunamadı." });
@@ -195,7 +197,8 @@ public class AuthController : ControllerBase
     [EnableRateLimiting("AuthPolicy")]
     public async Task<IActionResult> ResendVerificationCode([FromBody] ResendCodeDTO dto)
     {
-        var user = await _userService.GetByEmailAsync(dto.Email);
+        // Pasif kullanıcılar da yeni kod isteyebilmeli → IsActive filtresi uygulanmaz
+        var user = await _userService.GetByEmailForVerificationAsync(dto.Email);
 
         if (user == null)
             return NotFound(new { Message = "Bu e-posta adresine ait kayıtlı bir kullanıcı bulunamadı." });

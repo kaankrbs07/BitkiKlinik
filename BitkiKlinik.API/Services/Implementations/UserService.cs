@@ -27,6 +27,15 @@ public class UserService : GenericService<Users>, IUserService
     }
 
     /// <summary>
+    /// E-posta doğrulama akışlarında kullanılır (IsActive filtresi uygulanmaz).
+    /// Pasif veya henüz aktif edilmemiş kullanıcılar da OTP akışına dahil edilir.
+    /// </summary>
+    public async Task<Users?> GetByEmailForVerificationAsync(string email)
+    {
+        return await _context.Set<Users>().FirstOrDefaultAsync(u => u.Email == email);
+    }
+
+    /// <summary>
     /// Token değerini ve son kullanma tarihini tek sorguda doğrular.
     /// Pasif kullanıcılar dahil edilmez.
     /// </summary>

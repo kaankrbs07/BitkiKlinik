@@ -117,6 +117,9 @@ state: dict = {
 
 # Model yükleme ve inference işlemlerini senkronize etmek için kilit
 model_lock = threading.Lock()
+# Eğitim durum bilgilerini thread-safe güncellemek için kilit
+# (_blocking_train bir thread'de, endpoint'ler asyncio event loop'ta çalışır)
+state_lock  = threading.Lock()
 
 ALLOWED_CONTENT_TYPES = {
     "image/jpeg", "image/jpg", "image/png", "image/webp"
@@ -372,11 +375,12 @@ async def retrain():
     if state["training_status"] == "training":
         raise HTTPException(status_code=400, detail="Yeniden eğitim zaten devam ediyor.")
 
-    state.update(
-        training_status="training",
-        training_progress=0.0,
-        training_error=None
-    )
+    with state_lock:
+        state.update(
+            training_status="training",
+            training_progress=0.0,
+            training_error=None
+        )
 
     def _blocking_train() -> None:
         """Thread-pool'da çalışan senkron eğitim fonksiyonu."""
@@ -384,7 +388,8 @@ async def retrain():
             from retrain import retrain_model
 
             def progress_cb(epoch, num_epochs, t_loss, t_acc, v_loss, v_acc):
-                state["training_progress"] = float(epoch) / float(num_epochs)
+                with state_lock:
+                    state["training_progress"] = float(epoch) / float(num_epochs)
                 logger.info(
                     "Yeniden Eğitim İlerlemesi: Epoch %d/%d - Loss: %.4f, Val Acc: %.4f",
                     epoch, num_epochs, t_loss, v_acc
@@ -410,21 +415,24 @@ async def retrain():
                             if f.lower().endswith((".png", ".jpg", ".jpeg", ".webp")):
                                 all_files.append((label_dir / f).as_posix())
 
-            state["trained_files"]   = all_files
-            state["last_trained_at"] = datetime.datetime.now(datetime.timezone.utc).isoformat()
+            with state_lock:
+                state["trained_files"]   = all_files
+                state["last_trained_at"] = datetime.datetime.now(datetime.timezone.utc).isoformat()
             save_active_learning_meta(all_files)
 
-            state.update(
-                training_status="success",
-                training_progress=1.0,
-                last_trained_at=state["last_trained_at"],
-            )
+            with state_lock:
+                state.update(
+                    training_status="success",
+                    training_progress=1.0,
+                    last_trained_at=state["last_trained_at"],
+                )
 
             # C# API Webhook bildirimi göndererek yeni model dosyalarının Backblaze B2'ye yedeklenmesini tetikle
             try:
                 import requests
+                dotnet_host = os.environ.get("DOTNET_HOST", "localhost")
                 dotnet_port = os.environ.get("DOTNET_PORT", "5135")
-                webhook_url = f"http://localhost:{dotnet_port}/api/admin/active-learning/webhook/retrain-success"
+                webhook_url = f"http://{dotnet_host}:{dotnet_port}/api/admin/active-learning/webhook/retrain-success"
                 requests.post(webhook_url, json={"status": "success"}, timeout=5)
                 logger.info("C# API model yedekleme webhook bildirimi başarıyla gönderildi.")
             except Exception as web_ex:
@@ -432,11 +440,12 @@ async def retrain():
 
         except Exception as exc:
             logger.error("Yeniden eğitim hatası: %s", exc, exc_info=True)
-            state.update(
-                training_status="error",
-                training_error=str(exc),
-                training_progress=0.0,
-            )
+            with state_lock:
+                state.update(
+                    training_status="error",
+                    training_error=str(exc),
+                    training_progress=0.0,
+                )
 
     # asyncio.to_thread: bloklayan _blocking_train'i thread-pool executor'a taşır.
     # Event loop serbest kalır — GIL paylaşımı için time.sleep() gerekmiyor.

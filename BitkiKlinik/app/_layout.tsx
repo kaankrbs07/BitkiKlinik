@@ -8,6 +8,7 @@ import { useShallow } from 'zustand/react/shallow';
 
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useAuthStore } from '../store/useAuthStore';
+import { NetworkBanner } from '../components/NetworkBanner';
 
 export const unstable_settings = {
   anchor: '(tabs)',
@@ -77,6 +78,7 @@ export default function RootLayout() {
 
   return (
     <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
+      <NetworkBanner />
       <Stack>
         <Stack.Screen name="(auth)" options={{ headerShown: false }} />
         <Stack.Screen name="(tabs)" options={{ headerShown: false }} />

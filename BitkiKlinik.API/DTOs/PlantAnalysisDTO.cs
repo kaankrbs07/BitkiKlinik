@@ -32,3 +32,15 @@ public class PlantAnalysisResultDTO
     /// </summary>
     public string ImageUrl { get; set; } = string.Empty;
 }
+
+/// <summary>
+/// IScanOrchestrationService'in controller'a döndürdüğü birleşik tarama sonucu.
+/// Hastalık bilgisi, tedaviler, güven skoru, görsel URL'i ve kaydedilen tarama ID'sini içerir.
+/// </summary>
+public record ScanOrchestrationResultDTO(
+    DiseaseDTO Disease,
+    TreatmentsResultDTO Treatments,
+    float Confidence,
+    string? ImageUrl,
+    int ScanId
+);

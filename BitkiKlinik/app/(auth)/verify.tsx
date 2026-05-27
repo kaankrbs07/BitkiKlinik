@@ -4,6 +4,7 @@ import { useRouter, useLocalSearchParams } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { dotnetClient } from '../../api/client';
 import { useAuthStore } from '../../store/useAuthStore';
+import { showError } from '../../utils/errorHandler';
 
 export default function VerifyScreen() {
   const router = useRouter();
@@ -66,8 +67,7 @@ export default function VerifyScreen() {
       );
     } catch (error: any) {
       console.error(error);
-      const message = error.response?.data?.message || error.response?.data?.Message || 'E-posta doğrulanamadı.';
-      Alert.alert('Üzgünüz', message);
+      showError(error, { title: 'Doğrulama Başarısız' });
     } finally {
       setIsLoading(false);
     }
@@ -91,8 +91,7 @@ export default function VerifyScreen() {
       setTimeLeft(900);
     } catch (error: any) {
       console.error(error);
-      const message = error.response?.data?.message || error.response?.data?.Message || 'Yeni kod gönderilemedi.';
-      Alert.alert('Hata', message);
+      showError(error, { title: 'Kod Gönderilemedi' });
     } finally {
       setIsResending(false);
     }

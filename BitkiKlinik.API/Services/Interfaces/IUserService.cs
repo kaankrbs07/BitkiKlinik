@@ -6,6 +6,12 @@ public interface IUserService : IGenericService<Users>
 {
     Task<Users?> GetByUsernameAsync(string username);
     Task<Users?> GetByEmailAsync(string email);
+
+    /// <summary>
+    /// E-posta doğrulama akışlarında kullanılır (IsActive filtresi uygulanmaz).
+    /// Pasif kullanıcılar da OTP gönderebilmeli ve doğrulayabilmelidir.
+    /// </summary>
+    Task<Users?> GetByEmailForVerificationAsync(string email);
     Task<Users> CreateUserAsync(Users user);
 
     /// <summary>

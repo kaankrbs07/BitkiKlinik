@@ -20,7 +20,7 @@ services:
     image: mcr.microsoft.com/mssql/server:2022-latest
     container_name: bitkiklinik-sqlserver
     environment:
-      SA_PASSWORD: "YOUR_SA_PASSWORD"
+      SA_PASSWORD: "YOUR_PASSWORD"
       ACCEPT_EULA: "Y"
       MSSQL_PID: "Express"
     ports:
@@ -31,7 +31,7 @@ services:
       - bitkiklinik-net
     restart: unless-stopped
     healthcheck:
-      test: ["CMD-SHELL", "/opt/mssql-tools18/bin/sqlcmd -S localhost -U sa -P YOUR_SA_PASSWORD -Q 'SELECT 1' -C || exit 1"]
+      test: ["CMD-SHELL", "/opt/mssql-tools18/bin/sqlcmd -S localhost -U sa -P YOUR_PASSWORD -Q 'SELECT 1' -C || exit 1"]
       interval: 15s
       timeout: 10s
       retries: 10
@@ -67,6 +67,9 @@ services:
       target: serve
     container_name: bitkiklinik-ml-serve
     command: uvicorn serve:app --host 0.0.0.0 --port 8000
+    environment:
+      DOTNET_HOST: "bitkiklinik-api"
+      DOTNET_PORT: "5000"
     ports:
       - "8000:8000"
     volumes:
@@ -99,6 +102,8 @@ services:
     command: python retrain_worker.py
     environment:
       RABBITMQ_URL: "amqp://***REMOVED***@rabbitmq:5672/"
+      DOTNET_HOST: "bitkiklinik-api"
+      DOTNET_PORT: "5000"
     volumes:
       - ./BitkiKlinik.ML/outputs:/app/outputs
       - ./BitkiKlinik.ML/data:/app/data
@@ -125,7 +130,7 @@ services:
     environment:
       ASPNETCORE_ENVIRONMENT: Production
       ASPNETCORE_URLS: "http://+:5000"
-      ConnectionStrings__DefaultConnection: "Server=host.docker.internal;Database=PlantClinicDB;User Id=YOUR_DB_USER;Password=YOUR_DB_PASSWORD;Encrypt=False;TrustServerCertificate=True;MultipleActiveResultSets=true"
+      ConnectionStrings__DefaultConnection: "Server=host.docker.internal;Database=PlantClinicDB;User Id=YOUR_USER;Password=YOUR_PASSWORD;Encrypt=False;TrustServerCertificate=True;MultipleActiveResultSets=true"
       PythonApi__BaseUrl: "http://ml-serve:8000"
       RabbitMQ__ConnectionString: "amqp://***REMOVED***@rabbitmq:5672/"
       RabbitMQ__QueueName: "bitkiklinik.retrain"

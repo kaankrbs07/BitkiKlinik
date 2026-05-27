@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { 
   View, 
   Text, 
@@ -15,7 +15,6 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
-let hasAskedLocationThisSession = false;
 import { useRouter } from 'expo-router';
 import { useFocusEffect } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
@@ -34,6 +33,25 @@ import { API_ROUTES } from '../../constants/api-routes';
 import { dotnetClient } from '../../api/client';
 
 const { width } = Dimensions.get('window');
+
+// ── Domain Interfaces ────────────────────────────────────────────────
+interface ChatSession {
+  sessionId: string;
+  scanId: number | null;
+  plantName: string;
+  lastMessage: string;
+  lastMessageDate: string;
+  isHealthy: boolean;
+  imageUrl: string | null;
+}
+
+interface RiskAlert {
+  diseaseName: string;
+  riskPercentage: number;
+  riskLevel: 'Kritik' | 'Orta' | 'Düşük';
+  suggestion: string;
+  calculatedAt: string;
+}
 
 // Premium Color Palette
 const COLORS = {
@@ -323,10 +341,10 @@ function HistorySection({ recentScans, isLoading, error, onRefresh, onSeeAllPres
 // AI CHAT SECTION COMPONENT
 // ============================================================================
 interface AIChatHistorySectionProps {
-  sessions: any[];
+  sessions: ChatSession[];
   isLoading: boolean;
   onSeeAllPress: () => void;
-  onSessionPress: (scanId: any) => void;
+  onSessionPress: (scanId: number | null) => void;
 }
 
 function AIChatHistorySection({ sessions, isLoading, onSeeAllPress, onSessionPress }: AIChatHistorySectionProps) {
@@ -522,11 +540,12 @@ export default function HomeScreen() {
   const { stats, recentScans, isLoading, error, refresh } = useDashboardData();
   const { fetchProfile } = useProfile();
 
-  const [recentChats, setRecentChats] = useState<any[]>([]);
+  const [recentChats, setRecentChats] = useState<ChatSession[]>([]);
   const [isChatsLoading, setIsChatsLoading] = useState(true);
+  const hasAskedLocationThisSession = useRef(false);
 
   // Tarımsal tahmin durumları
-  const [riskAlert, setRiskAlert] = useState<any>(null);
+  const [riskAlert, setRiskAlert] = useState<RiskAlert | null>(null);
   const [isRiskLoading, setIsRiskLoading] = useState(true);
   const [locationGranted, setLocationGranted] = useState<boolean | null>(null);
   const [showLocationModal, setShowLocationModal] = useState(false);
@@ -557,14 +576,14 @@ export default function HomeScreen() {
           // EĞER veritabanında henüz hesaplanmış bir risk yoksa (kullanıcı ilk kez giriş yapmışsa ve konumu yoksa)
           // ve bu oturumda henüz sormadıysak, konum açıklama modalını gösterelim!
           const isDefaultAlert = response.data?.suggestion?.includes("Konumunuz güncellendiğinde") || !response.data?.calculatedAt;
-          if (isDefaultAlert && !hasAskedLocationThisSession) {
-            hasAskedLocationThisSession = true;
+          if (isDefaultAlert && !hasAskedLocationThisSession.current) {
+            hasAskedLocationThisSession.current = true;
             setShowLocationModal(true);
           }
         } catch (err) {
           console.error("Hastalık riski çekilemedi (konumsuz):", err);
-          if (!hasAskedLocationThisSession) {
-            hasAskedLocationThisSession = true;
+          if (!hasAskedLocationThisSession.current) {
+            hasAskedLocationThisSession.current = true;
             setShowLocationModal(true);
           }
         }
@@ -584,8 +603,8 @@ export default function HomeScreen() {
           if (isDefaultAlert) {
             setLocationGranted(false);
             setIsRiskLoading(false);
-            if (!hasAskedLocationThisSession) {
-              hasAskedLocationThisSession = true;
+            if (!hasAskedLocationThisSession.current) {
+              hasAskedLocationThisSession.current = true;
               setShowLocationModal(true);
             }
             return; // Durdur, kullanıcı modalda "İzin Ver" diyene kadar getCurrentPositionAsync() çağırma!

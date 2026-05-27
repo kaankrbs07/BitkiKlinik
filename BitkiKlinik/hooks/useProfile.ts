@@ -2,6 +2,7 @@ import { useState, useCallback } from 'react';
 import { Platform } from 'react-native';
 import { dotnetClient } from '../api/client';
 import { useAuthStore } from '../store/useAuthStore';
+import { getErrorMessage } from '../utils/errorHandler';
 
 export interface ProfileResponseDTO {
   id: number;
@@ -59,7 +60,7 @@ export function useProfile(): UseProfileReturn {
       updateProfilePictureInStore(response.data?.profilePictureUrl ?? null);
     } catch (err: any) {
       console.error('[useProfile] fetchProfile hatası:', err);
-      const errMsg = err.response?.data?.message ?? err.response?.data?.Message ?? 'Profil bilgileri yüklenemedi.';
+      const errMsg = getErrorMessage(err);
       setError(errMsg);
     } finally {
       setIsLoading(false);
@@ -115,7 +116,7 @@ export function useProfile(): UseProfileReturn {
       return true;
     } catch (err: any) {
       console.error('[useProfile] updateProfile hatası:', err);
-      const errMsg = err.response?.data?.message ?? err.response?.data?.Message ?? 'Profil güncellenirken bir hata oluştu.';
+      const errMsg = getErrorMessage(err);
       setError(errMsg);
       return false;
     } finally {
@@ -137,7 +138,7 @@ export function useProfile(): UseProfileReturn {
       return true;
     } catch (err: any) {
       console.error('[useProfile] removeProfilePicture hatası:', err);
-      const errMsg = err.response?.data?.message ?? err.response?.data?.Message ?? 'Profil resmi kaldırılırken bir hata oluştu.';
+      const errMsg = getErrorMessage(err);
       setError(errMsg);
       return false;
     } finally {

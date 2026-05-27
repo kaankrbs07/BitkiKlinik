@@ -364,12 +364,19 @@ export default function ProfileScreen() {
                   {isSaving ? (
                     <View style={styles.loadingRow}>
                       <ActivityIndicator size="small" color="#fff" style={{ marginRight: 8 }} />
-                      <Text style={styles.saveButtonText}>Güncelleniyor...</Text>
+                      <Text style={styles.saveButtonText}>
+                        {selectedImageUri ? 'Fotoğraf Yükleniyor...' : 'Güncelleniyor...'}
+                      </Text>
                     </View>
                   ) : (
                     <Text style={styles.saveButtonText}>Değişiklikleri Kaydet</Text>
                   )}
                 </TouchableOpacity>
+                {isSaving && selectedImageUri && (
+                  <Text style={styles.uploadHint}>
+                    Profil fotoğrafınız sunucuya yükleniyor, lütfen bekleyin...
+                  </Text>
+                )}
               </Animated.View>
 
             </ScrollView>
@@ -667,5 +674,11 @@ const styles = StyleSheet.create({
   loadingRow: {
     flexDirection: 'row',
     alignItems: 'center',
+  },
+  uploadHint: {
+    fontSize: 12,
+    color: '#64748b',
+    textAlign: 'center',
+    marginTop: 8,
   },
 });

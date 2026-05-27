@@ -4,6 +4,7 @@ import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { dotnetClient } from '../../api/client';
 import { useAuthStore } from '../../store/useAuthStore';
+import { showError } from '../../utils/errorHandler';
 
 export default function RegisterScreen() {
   const router = useRouter();
@@ -43,8 +44,7 @@ export default function RegisterScreen() {
       );
     } catch (error: any) {
       console.error(error);
-      const message = error.response?.data?.message || error.response?.data?.Message || 'Kayıt olunamadı.';
-      Alert.alert('Hata', message);
+      showError(error, { title: 'Kayıt Hatası' });
     } finally {
       setIsLoading(false);
     }

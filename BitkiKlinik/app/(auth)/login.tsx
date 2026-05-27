@@ -5,6 +5,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { dotnetClient } from '../../api/client';
 import { CONFIG } from '../../constants/config';
 import { useAuthStore } from '../../store/useAuthStore';
+import { showError } from '../../utils/errorHandler';
 
 export default function LoginScreen() {
   const router = useRouter();
@@ -39,8 +40,7 @@ export default function LoginScreen() {
       }
     } catch (error: any) {
       console.error(error);
-      const message = error.response?.data?.message || error.response?.data?.Message || 'Giriş yapılamadı.';
-      Alert.alert('Giriş Başarısız', message);
+      showError(error, { title: 'Giriş Başarısız' });
     } finally {
       setIsLoading(false);
     }

@@ -121,8 +121,9 @@ def run_retrain() -> None:
         # C# API Webhook bildirimi göndererek yeni model dosyalarının Backblaze B2'ye yedeklenmesini tetikle
         try:
             import requests
+            dotnet_host = os.environ.get("DOTNET_HOST", "localhost")
             dotnet_port = os.environ.get("DOTNET_PORT", "5135")
-            webhook_url = f"http://localhost:{dotnet_port}/api/admin/active-learning/webhook/retrain-success"
+            webhook_url = f"http://{dotnet_host}:{dotnet_port}/api/admin/active-learning/webhook/retrain-success"
             requests.post(webhook_url, json={"status": "success"}, timeout=5)
             logger.info("C# API model yedekleme webhook bildirimi başarıyla gönderildi.")
         except Exception as web_ex:

@@ -125,6 +125,12 @@ export default function ExploreScreen() {
   const [refreshing, setRefreshing] = useState(false);
   const [actionLoading, setActionLoading] = useState<number | null>(null); // Hangi geçmiş kaydının yüklendiğini tutar
 
+  // Geçmiş sayfalama durumu
+  const [historyPage, setHistoryPage] = useState(1);
+  const [historyHasMore, setHistoryHasMore] = useState(true);
+  const [historyLoadingMore, setHistoryLoadingMore] = useState(false);
+  const HISTORY_PAGE_SIZE = 20;
+
   // Genişleyen Ansiklopedi Kartı ID'si
   const [expandedDiseaseId, setExpandedDiseaseId] = useState<number | null>(null);
   // Kart içi tedavi sekmesi: 'natural' | 'chemical'
@@ -133,8 +139,6 @@ export default function ExploreScreen() {
   // --- Veri Çekme Fonksiyonları --- //
 
   const fetchEncyclopedia = async () => {
-    const token = useAuthStore.getState().token;
-    if (!token) return;
     try {
       const response = await dotnetClient.get('/Diseases');
       setDiseases(response.data || []);
@@ -143,26 +147,30 @@ export default function ExploreScreen() {
     }
   };
 
-  const fetchHistory = async () => {
-    const token = useAuthStore.getState().token;
-    if (!token) return;
+  const fetchHistory = async (page = 1, append = false) => {
     try {
-      // Sayfalanmış geçmişin tamamını çekmek için yüksek limitli sorgu atıyoruz
-      const response = await dotnetClient.get('/Dashboard/history?page=1&pageSize=100');
-      setScans(response.data?.data || []);
+      const response = await dotnetClient.get(`/Dashboard/history?page=${page}&pageSize=${HISTORY_PAGE_SIZE}`);
+      const newScans: ScanHistoryItem[] = response.data?.data || [];
+      setScans(prev => (append ? [...prev, ...newScans] : newScans));
+      setHistoryHasMore(newScans.length === HISTORY_PAGE_SIZE);
+      setHistoryPage(page);
     } catch (e) {
-      console.error('Geçmiş yüklenirken hata:', e);
+      console.error('Geçmiş yükleniırken hata:', e);
     }
   };
 
+  const loadMoreHistory = async () => {
+    if (historyLoadingMore || !historyHasMore) return;
+    setHistoryLoadingMore(true);
+    await fetchHistory(historyPage + 1, true);
+    setHistoryLoadingMore(false);
+  };
+
   const loadData = useCallback(async (isSilent = false) => {
-    const token = useAuthStore.getState().token;
-    if (!token) {
-      setLoading(false);
-      return;
-    }
     if (!isSilent) setLoading(true);
-    await Promise.all([fetchEncyclopedia(), fetchHistory()]);
+    setHistoryPage(1);
+    setHistoryHasMore(true);
+    await Promise.all([fetchEncyclopedia(), fetchHistory(1, false)]);
     setLoading(false);
   }, [isAuthenticated]);
 
@@ -633,6 +641,15 @@ export default function ExploreScreen() {
                   renderItem={renderHistoryCard}
                   contentContainerStyle={styles.listPadding}
                   showsVerticalScrollIndicator={false}
+                  onEndReached={loadMoreHistory}
+                  onEndReachedThreshold={0.3}
+                  ListFooterComponent={
+                    historyLoadingMore ? (
+                      <View style={{ paddingVertical: 16, alignItems: 'center' }}>
+                        <ActivityIndicator color={COLORS.emerald} size="small" />
+                      </View>
+                    ) : null
+                  }
                   refreshControl={
                     <RefreshControl
                       refreshing={refreshing}

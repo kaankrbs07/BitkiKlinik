@@ -17,42 +17,30 @@ public class PlantAnalysisService : IPlantAnalysisService
     private readonly ILogger<PlantAnalysisService> _logger;
     private readonly IActiveLearningService _activeLearningService;
     private readonly IConfiguration _configuration;
+    private readonly IFileStorageService _fileStorageService;
 
     // ── Konfigürasyon değerleri ───────────────────────────────────────────────
     private readonly string _analyzeEndpoint;
-    private readonly string _uploadPath;          // fiziksel klasör (wwwroot/uploads/scans)
-    private readonly long   _maxFileSizeBytes;
-    private readonly HashSet<string> _allowedExtensions;
 
     public PlantAnalysisService(
         IHttpClientFactory httpClientFactory,
         IWebHostEnvironment env,
         IConfiguration configuration,
         ILogger<PlantAnalysisService> logger,
-        IActiveLearningService activeLearningService)
+        IActiveLearningService activeLearningService,
+        IFileStorageService fileStorageService)
     {
         _httpClientFactory = httpClientFactory;
         _env               = env;
         _logger            = logger;
         _activeLearningService = activeLearningService;
         _configuration      = configuration;
+        _fileStorageService = fileStorageService;
 
         // appsettings.json → PythonApi
         var pythonSection  = configuration.GetSection("PythonApi");
         // Sadece göreli yol saklanır; named client'in BaseAddress'i baz URL'i sağlıyor.
         _analyzeEndpoint   = pythonSection["AnalyzeEndpoint"] ?? "/analyze";
-
-        // appsettings.json → FileStorage
-        var storageSection = configuration.GetSection("FileStorage");
-        _uploadPath        = storageSection["UploadPath"] ?? "wwwroot/uploads/scans";
-        _maxFileSizeBytes  = (long)(double.Parse(storageSection["MaxFileSizeMb"] ?? "10") * 1024 * 1024);
-
-        _allowedExtensions = storageSection
-            .GetSection("AllowedExtensions")
-            .Get<string[]>()
-            ?.Select(e => e.ToLowerInvariant())
-            .ToHashSet()
-            ?? new HashSet<string> { ".jpg", ".jpeg", ".png", ".webp" };
     }
 
     // ── Ana iş akışı ─────────────────────────────────────────────────────────
@@ -61,8 +49,8 @@ public class PlantAnalysisService : IPlantAnalysisService
         // 1. Dosya validasyonu
         ValidateFile(image);
 
-        // 2. Görseli yerel diske kaydet → göreli URL üret
-        var imageUrl = await SaveFileAsync(image);
+        // 2. Görseli depolama servisi ile kaydet → göreli URL üret
+        var imageUrl = await _fileStorageService.SaveFileAsync(image, "scans");
 
         // 3. IFormFile stream'ini doğrudan Python API'ye ilet (diskten okuma yok)
         var pythonResponse = await ForwardToPythonAsync(image);
@@ -88,15 +76,8 @@ public class PlantAnalysisService : IPlantAnalysisService
     /// </summary>
     private void ValidateFile(IFormFile image)
     {
-        if (image.Length == 0)
-            throw new ArgumentException("Yüklenen dosya boş olamaz.");
-
-        if (image.Length > _maxFileSizeBytes)
-            throw new ArgumentException($"Dosya boyutu {_maxFileSizeBytes / 1024 / 1024} MB sınırını aşıyor.");
-
-        var extension = Path.GetExtension(image.FileName).ToLowerInvariant();
-        if (!_allowedExtensions.Contains(extension))
-            throw new ArgumentException($"Desteklenmeyen dosya türü: {extension}. İzin verilenler: {string.Join(", ", _allowedExtensions)}");
+        // Depolama servisinin genel validasyonunu çağır
+        _fileStorageService.ValidateFile(image);
 
         // Magic-byte doğrulaması: sadece uzantıya değil, dosyanın gerçek içeriğine bak.
         // Bu, .jpg olarak yeniden adlandırılmış SVG veya binary dosyaları engeller.
@@ -155,30 +136,6 @@ public class PlantAnalysisService : IPlantAnalysisService
 
         // IFormFile stream'i paylaşılmış olabilir; başa sar.
         stream.Position = 0;
-    }
-
-
-    /// <summary>
-    /// Dosyayı wwwroot/uploads/scans/ altına GUID ismiyle kaydeder.
-    /// Mobil uygulamanın erişebileceği göreli URL'i döndürür.
-    /// </summary>
-    private async Task<string> SaveFileAsync(IFormFile image)
-    {
-        // Fiziksel hedef klasörü oluştur (yoksa)
-        var physicalFolder = Path.Combine(_env.ContentRootPath, _uploadPath);
-        Directory.CreateDirectory(physicalFolder);
-
-        // Benzersiz dosya adı: GUID + orijinal uzantı
-        var extension = Path.GetExtension(image.FileName).ToLowerInvariant();
-        var uniqueName = $"{Guid.NewGuid()}{extension}";
-        var physicalPath = Path.Combine(physicalFolder, uniqueName);
-
-        await using var fileStream = new FileStream(physicalPath, FileMode.Create, FileAccess.Write, FileShare.None);
-        await image.CopyToAsync(fileStream);
-
-        // Göreli URL (mobil uygulamanın çekebileceği endpoint formatı)
-        // Örn: /uploads/scans/3f2a1b4c-abcd-1234-efgh-5678ijkl.jpg
-        return $"/uploads/scans/{uniqueName}";
     }
 
     /// <summary>

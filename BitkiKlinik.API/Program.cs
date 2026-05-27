@@ -62,6 +62,7 @@ builder.Services.AddScoped<IDashboardService, DashboardService>();
 builder.Services.AddScoped<IScanService, ScanService>();
 builder.Services.AddScoped<IAdminDiseaseService, AdminDiseaseService>();
 builder.Services.AddScoped<IActiveLearningService, ActiveLearningService>();
+builder.Services.AddScoped<IScanOrchestrationService, ScanOrchestrationService>();
 builder.Services.AddScoped<IGeminiService, GeminiService>();
 builder.Services.AddScoped<IWeatherService, WeatherService>();
 builder.Services.AddHttpClient();
@@ -124,6 +125,17 @@ builder.Services.AddRateLimiter(options =>
     // ── Auth limiter: IP başına kaba-kuvvet koruması ──────────────────
     // AuthController endpoint'leri [EnableRateLimiting("AuthPolicy")] ile işaretlenmiştir.
     options.AddPolicy<string, ClientIpRateLimiterPolicy>("AuthPolicy");
+
+    // ── Chat limiter: dakikada 20 mesaj sınırı ────────────────────────
+    // ChatController POST endpoint'i [EnableRateLimiting("ChatPolicy")] ile işaretlenmiştir.
+    options.AddSlidingWindowLimiter("ChatPolicy", opt =>
+    {
+        opt.Window               = TimeSpan.FromMinutes(1);
+        opt.PermitLimit          = 20;
+        opt.SegmentsPerWindow    = 4;
+        opt.QueueProcessingOrder = QueueProcessingOrder.OldestFirst;
+        opt.QueueLimit           = 0;
+    });
 
     options.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
 });
