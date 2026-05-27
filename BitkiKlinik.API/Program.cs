@@ -3,9 +3,12 @@ using System.Threading.RateLimiting;
 using BitkiKlinik.API.Configuration;
 using BitkiKlinik.API.Data;
 using BitkiKlinik.API.HostedServices;
+using BitkiKlinik.API.Jobs;
 using BitkiKlinik.API.Services;
 using BitkiKlinik.API.Services.Interfaces;
 using BitkiKlinik.API.Services.Implementations;
+using Hangfire;
+using Hangfire.SqlServer;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
@@ -51,6 +54,35 @@ builder.Services.AddScoped<IActiveLearningService, ActiveLearningService>();
 builder.Services.AddScoped<IGeminiService, GeminiService>();
 builder.Services.AddScoped<IWeatherService, WeatherService>();
 builder.Services.AddHttpClient();
+
+// ── Hangfire Arka Plan İş Yöneticisi ──────────────────────────────────────────
+// E-posta ve Push bildirimleri artık güvenilir Hangfire kuyrukları üzerinden çalışır.
+// Görevler SQL Server'da kalıcı; uygulama yeniden başlasa bile tamamlanmamış işler devam eder.
+var hangfireConnectionString = builder.Configuration.GetConnectionString("DefaultConnection")!;
+builder.Services.AddHangfire(config => config
+    .SetDataCompatibilityLevel(CompatibilityLevel.Version_180)
+    .UseSimpleAssemblyNameTypeSerializer()
+    .UseRecommendedSerializerSettings()
+    .UseSqlServerStorage(hangfireConnectionString, new SqlServerStorageOptions
+    {
+        CommandBatchMaxTimeout       = TimeSpan.FromMinutes(5),
+        SlidingInvisibilityTimeout   = TimeSpan.FromMinutes(5),
+        QueuePollInterval            = TimeSpan.Zero,
+        UseRecommendedIsolationLevel = true,
+        DisableGlobalLocks           = true
+    }));
+builder.Services.AddHangfireServer(options =>
+{
+    options.WorkerCount = Environment.ProcessorCount * 2; // CPU başına 2 worker
+});
+
+// ── Hangfire Job Sınıfları ────────────────────────────────────────────────────
+builder.Services.AddScoped<IEmailJob, EmailJob>();
+builder.Services.AddScoped<IPushNotificationJob, PushNotificationJob>();
+
+// ── RabbitMQ Retrain Kuyruk Servisi ──────────────────────────────────────────
+// Singleton: bağlantı bir kez kurulur, tüm istek döngüleri paylaşır.
+builder.Services.AddSingleton<IRetrainQueueService, RabbitMqRetrainQueueService>();
 
 builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
     .AddJwtBearer(options =>
@@ -144,6 +176,14 @@ app.UseCors("AllowAllOrigins");
 
 app.UseAuthentication();
 app.UseAuthorization();
+
+// ── Hangfire Dashboard (Yalnızca Admin) ───────────────────────────────────────
+// /hangfire endpoint'ine yalnızca Admin rolüyle erişilebilir.
+app.UseHangfireDashboard("/hangfire", new DashboardOptions
+{
+    Authorization = [new Hangfire.Dashboard.LocalRequestsOnlyAuthorizationFilter()],
+    DashboardTitle  = "BitkiKlinik Arka Plan İşleri"
+});
 
 app.MapControllers();
 

@@ -1,12 +1,12 @@
+using BitkiKlinik.API.Jobs;
 using BitkiKlinik.API.Services.Interfaces;
+using Hangfire;
 using MailKit.Net.Smtp;
 using MailKit.Security;
 using Microsoft.Extensions.Configuration;
 using MimeKit;
 using MimeKit.Text;
 using Microsoft.Extensions.Logging;
-using Microsoft.Extensions.DependencyInjection;
-using System.Threading.Tasks;
 
 namespace BitkiKlinik.API.Services.Implementations;
 
@@ -14,16 +14,13 @@ public class EmailService : IEmailService
 {
     private readonly IConfiguration _configuration;
     private readonly ILogger<EmailService> _logger;
-    private readonly IServiceScopeFactory _scopeFactory;
 
     public EmailService(
         IConfiguration configuration, 
-        ILogger<EmailService> logger,
-        IServiceScopeFactory scopeFactory)
+        ILogger<EmailService> logger)
     {
         _configuration = configuration;
         _logger = logger;
-        _scopeFactory = scopeFactory;
     }
 
     public async Task SendEmailAsync(string toAuthUserEmail, string subject, string htmlMessage)
@@ -52,23 +49,16 @@ public class EmailService : IEmailService
         await smtp.DisconnectAsync(true);
     }
 
+    /// <summary>
+    /// E-postayı Hangfire arka plan kuyruğuna ekler.
+    /// Task.Run'ın aksine:
+    /// - Görev SQL Server'da kalıcı olarak saklanır (uygulama yeniden başlasa bile kaybolmaz).
+    /// - Başarısız gönderimler otomatik yeniden denenir (EmailJob içindeki AutomaticRetry ile).
+    /// - Hangfire Dashboard'dan izlenebilir.
+    /// </summary>
     public void SendEmailInBackground(string toAuthUserEmail, string subject, string htmlMessage)
     {
-        // Don't await this; fire and forget
-        _ = Task.Run(async () =>
-        {
-            try
-            {
-                // Create a new scope to resolve a fresh IEmailService
-                using var scope = _scopeFactory.CreateScope();
-                var scopedEmailService = scope.ServiceProvider.GetRequiredService<IEmailService>();
-                
-                await scopedEmailService.SendEmailAsync(toAuthUserEmail, subject, htmlMessage);
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "Arka planda e-posta gönderilirken hata oluştu. Alıcı: {Email}", toAuthUserEmail);
-            }
-        });
+        BackgroundJob.Enqueue<IEmailJob>(job => job.SendAsync(toAuthUserEmail, subject, htmlMessage));
+        _logger.LogInformation("E-posta Hangfire kuyruğuna eklendi. Alıcı: {Email}", toAuthUserEmail);
     }
-}
+}

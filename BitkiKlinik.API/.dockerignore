@@ -1,0 +1,11 @@
+# API — .dockerignore
+bin/
+obj/
+.vs/
+.vscode/
+*.user
+*.suo
+appsettings.Development.json
+
+# Upload dizini (volume'dan gelir)
+wwwroot/uploads/

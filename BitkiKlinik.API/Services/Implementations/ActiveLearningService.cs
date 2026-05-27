@@ -15,19 +15,22 @@ public class ActiveLearningService : IActiveLearningService
     private readonly IConfiguration _configuration;
     private readonly IWebHostEnvironment _env;
     private readonly ILogger<ActiveLearningService> _logger;
+    private readonly IRetrainQueueService? _retrainQueueService;
 
     public ActiveLearningService(
         ApplicationDbContext context,
         IHttpClientFactory httpClientFactory,
         IConfiguration configuration,
         IWebHostEnvironment env,
-        ILogger<ActiveLearningService> logger)
+        ILogger<ActiveLearningService> logger,
+        IRetrainQueueService? retrainQueueService = null)
     {
         _context = context;
         _httpClientFactory = httpClientFactory;
         _configuration = configuration;
         _env = env;
         _logger = logger;
+        _retrainQueueService = retrainQueueService;
     }
 
     public async Task EnqueueAsync(int? scanId, string imagePath, string predictedDisease, double confidence, ActiveLearningSource source)
@@ -243,6 +246,64 @@ public class ActiveLearningService : IActiveLearningService
         try
         {
             var client = _httpClientFactory.CreateClient("PythonApiClient");
+
+            // ── Önce örnek sayısını kontrol et ───────────────────────────────────
+            // 30'dan az örnekle eğitim aşırı öğrenmeye (overfitting) yol açar.
+            var retrainStatusEndpoint = _configuration["PythonApi:RetrainStatusEndpoint"] ?? "/active-learning/retrain-status";
+            try
+            {
+                var statusResponse = await client.GetAsync(retrainStatusEndpoint);
+                if (statusResponse.IsSuccessStatusCode)
+                {
+                    var statusJson = await statusResponse.Content.ReadAsStringAsync();
+                    var statusDoc  = System.Text.Json.JsonDocument.Parse(statusJson);
+                    var totalSamples = statusDoc.RootElement.GetProperty("totalSamples").GetInt32();
+
+                    const int MinSamplesRequired = 30;
+                    if (totalSamples < MinSamplesRequired)
+                    {
+                        _logger.LogWarning(
+                            "Yeniden eğitim reddedildi: Yetersiz örnek sayısı. Mevcut: {Current}, Gerekli: {Required}",
+                            totalSamples, MinSamplesRequired);
+
+                        return new RetrainResponseDTO
+                        {
+                            Status  = "insufficient_data",
+                            Message = $"Yetersiz aktif öğrenme verisi: {totalSamples} görsel mevcut, " +
+                                      $"yeniden eğitim için en az {MinSamplesRequired} doğrulanmış görsel gereklidir. " +
+                                      $"({MinSamplesRequired - totalSamples} görsel daha gerekiyor)"
+                        };
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "Retrain-status sorgusu başarısız, doğrudan eğitim tetikleniyor.");
+            }
+
+            // ── Eğitimi tetikle ───────────────────────────────────────
+            // Önce RabbitMQ kuyruğuna mesaj atmayı dene (çıkarım/eğitim ayrımı).
+            // RabbitMQ kullanılamazsa fallback olarak doğrudan Python API'ye HTTP gönder.
+            if (_retrainQueueService is not null)
+            {
+                var isHealthy = await _retrainQueueService.IsHealthyAsync();
+                if (isHealthy)
+                {
+                    var published = await _retrainQueueService.PublishRetrainJobAsync();
+                    if (published)
+                    {
+                        _logger.LogInformation("Yeniden eğitim işi RabbitMQ kuyruğuna eklendi: {Queue}", "bitkiklinik.retrain");
+                        return new RetrainResponseDTO
+                        {
+                            Status  = "queued",
+                            Message = "Yeniden eğitim isteği RabbitMQ kuyruğuna eklendi. Worker süreci işlemeye başlayacak."
+                        };
+                    }
+                }
+                _logger.LogWarning("RabbitMQ erişilemez durumda. Doğrudan Python API'ye geçiliyor.");
+            }
+
+            // Fallback: Doğrudan Python FastAPI'ye HTTP isteği at
             var retrainEndpoint = _configuration["PythonApi:RetrainEndpoint"] ?? "/active-learning/retrain";
             
             var response = await client.PostAsync(retrainEndpoint, null);
@@ -252,7 +313,7 @@ public class ActiveLearningService : IActiveLearningService
                 return new RetrainResponseDTO
                 {
                     Status = "started",
-                    Message = "Model fine-tuning arka planda başlatıldı."
+                    Message = "Model fine-tuning arka planda başlatıldı (doğrudan Python API)."
                 };
             }
             else

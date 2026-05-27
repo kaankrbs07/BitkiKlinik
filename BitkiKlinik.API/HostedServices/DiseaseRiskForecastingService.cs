@@ -1,13 +1,14 @@
 using System;
 using System.Linq;
 using System.Net.Http;
-using System.Net.Http.Json;
 using System.Threading;
 using System.Threading.Tasks;
 using BitkiKlinik.API.Data;
+using BitkiKlinik.API.Jobs;
 using BitkiKlinik.API.Models;
 using BitkiKlinik.API.Services.Implementations;
 using BitkiKlinik.API.Services.Interfaces;
+using Hangfire;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
@@ -19,16 +20,13 @@ public class DiseaseRiskForecastingService : BackgroundService
 {
     private readonly IServiceProvider _services;
     private readonly ILogger<DiseaseRiskForecastingService> _logger;
-    private readonly IHttpClientFactory _httpClientFactory;
 
     public DiseaseRiskForecastingService(
         IServiceProvider services,
-        ILogger<DiseaseRiskForecastingService> logger,
-        IHttpClientFactory httpClientFactory)
+        ILogger<DiseaseRiskForecastingService> logger)
     {
         _services = services;
-        _logger = logger;
-        _httpClientFactory = httpClientFactory;
+        _logger   = logger;
     }
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
@@ -110,10 +108,19 @@ public class DiseaseRiskForecastingService : BackgroundService
                 db.DiseaseRiskAlerts.Add(alert);
                 await db.SaveChangesAsync(stoppingToken);
 
-                // Eğer risk kritikse (>= 75%) ve kullanıcının push token'ı tanımlıysa, anlık bildirim gönder
+                // Eğer risk kritikse (>= 75%) ve kullanıcının push token'ı tanımlıysa
+                // Hangfire kuyruğuna push bildirimi işi ekle — doğrudan HTTP yerine.
+                // Bu sayede:
+                //   - Ana döngü bloklanmaz (10.000 kullanıcı için bile akıcı çalışır)
+                //   - Başarısız bildirimler otomatik yeniden denenir (PushNotificationJob AutomaticRetry)
+                //   - Hangfire Dashboard'dan her bildirim izlenebilir
                 if (riskPercentage >= 75.0f && !string.IsNullOrEmpty(user.ExpoPushToken))
                 {
-                    await SendPushNotificationAsync(user.ExpoPushToken, riskPercentage, suggestion);
+                    BackgroundJob.Enqueue<IPushNotificationJob>(
+                        job => job.SendAsync(user.ExpoPushToken, riskPercentage, suggestion));
+
+                    _logger.LogInformation(
+                        "Push bildirimi Hangfire kuyruğuna eklendi. UserId: {UserId}", user.Id);
                 }
             }
             catch (Exception ex)
@@ -122,37 +129,5 @@ public class DiseaseRiskForecastingService : BackgroundService
             }
         }
     }
-
-    private async Task SendPushNotificationAsync(string pushToken, float riskPercentage, string suggestion)
-    {
-        try
-        {
-            _logger.LogInformation("Expo Push Notification gönderiliyor. Alıcı: {Token}", pushToken);
-            
-            var client = _httpClientFactory.CreateClient();
-            var payload = new
-            {
-                to = pushToken,
-                sound = "default",
-                title = "Kritik Mantar Hastalığı Riski! ⚠️",
-                body = $"Tarlanızda Mildiyö riski %{riskPercentage} seviyesine ulaştı. Önlem: {suggestion}",
-                data = new { screen = "home" }
-            };
-
-            var response = await client.PostAsJsonAsync("https://exp.host/--/api/v2/push/send", payload);
-            if (response.IsSuccessStatusCode)
-            {
-                _logger.LogInformation("Push bildirimi başarıyla gönderildi.");
-            }
-            else
-            {
-                var errorText = await response.Content.ReadAsStringAsync();
-                _logger.LogWarning("Push bildirimi başarısız oldu. Hata: {Error}", errorText);
-            }
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Push bildirimi gönderilirken beklenmeyen hata.");
-        }
-    }
 }
+

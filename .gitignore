@@ -33,6 +33,7 @@ out/
 !**/wwwroot/uploads/.gitkeep
 **/appsettings.json
 **/appsettings.Development.json
+**/BitkiKlinik.API/keys/
 *.db
 *.sqlite
 

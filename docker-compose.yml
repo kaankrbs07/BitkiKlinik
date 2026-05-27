@@ -1,0 +1,159 @@
+version: "3.9"
+
+# ─────────────────────────────────────────────
+#  BitkiKlinik — Docker Compose
+#  Servisler:
+#    • sqlserver     → MS SQL Server 2022
+#    • rabbitmq      → RabbitMQ 3 (management UI)
+#    • ml-serve      → Python FastAPI inference (port 8000)
+#    • ml-worker     → Python RabbitMQ retrain worker
+#    • api           → .NET 9 ASP.NET Core (port 5000)
+#
+#  Expo (React Native) mobil uygulama container'a alınmaz;
+#  doğrudan geliştirici makinasında çalıştırılır.
+# ─────────────────────────────────────────────
+
+services:
+
+  # ── SQL Server ────────────────────────────────────────────────────────────
+  sqlserver:
+    image: mcr.microsoft.com/mssql/server:2022-latest
+    container_name: bitkiklinik-sqlserver
+    environment:
+      SA_PASSWORD: "***REMOVED***"
+      ACCEPT_EULA: "Y"
+      MSSQL_PID: "Express"
+    ports:
+      - "14333:1433"
+    volumes:
+      - sqlserver_data:/var/opt/mssql
+    networks:
+      - bitkiklinik-net
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "/opt/mssql-tools18/bin/sqlcmd -S localhost -U sa -P ***REMOVED*** -Q 'SELECT 1' -C || exit 1"]
+      interval: 15s
+      timeout: 10s
+      retries: 10
+      start_period: 30s
+
+  # ── RabbitMQ ──────────────────────────────────────────────────────────────
+  rabbitmq:
+    image: rabbitmq:3-management
+    container_name: bitkiklinik-rabbitmq
+    environment:
+      RABBITMQ_DEFAULT_USER: guest
+      RABBITMQ_DEFAULT_PASS: guest
+    ports:
+      - "5672:5672"    # AMQP
+      - "15672:15672"  # Management UI → http://localhost:15672
+    volumes:
+      - rabbitmq_data:/var/lib/rabbitmq
+    networks:
+      - bitkiklinik-net
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
+      interval: 15s
+      timeout: 10s
+      retries: 10
+      start_period: 20s
+
+  # ── ML Inference Servisi (FastAPI) ────────────────────────────────────────
+  ml-serve:
+    build:
+      context: ./BitkiKlinik.ML
+      dockerfile: Dockerfile
+      target: serve
+    container_name: bitkiklinik-ml-serve
+    command: uvicorn serve:app --host 0.0.0.0 --port 8000
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./BitkiKlinik.ML/outputs:/app/outputs
+      - ./BitkiKlinik.ML/data:/app/data
+    networks:
+      - bitkiklinik-net
+    restart: unless-stopped
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 60s
+
+  # ── ML Retrain Worker (RabbitMQ consumer) ────────────────────────────────
+  ml-worker:
+    build:
+      context: ./BitkiKlinik.ML
+      dockerfile: Dockerfile
+      target: worker
+    container_name: bitkiklinik-ml-worker
+    command: python retrain_worker.py
+    environment:
+      RABBITMQ_URL: "amqp://***REMOVED***@rabbitmq:5672/"
+    volumes:
+      - ./BitkiKlinik.ML/outputs:/app/outputs
+      - ./BitkiKlinik.ML/data:/app/data
+    networks:
+      - bitkiklinik-net
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
+    restart: unless-stopped
+
+  # ── .NET 9 ASP.NET Core API ───────────────────────────────────────────────
+  api:
+    build:
+      context: ./BitkiKlinik.API
+      dockerfile: Dockerfile
+    container_name: bitkiklinik-api
+    environment:
+      ASPNETCORE_ENVIRONMENT: Production
+      ASPNETCORE_URLS: "http://+:5000"
+      ConnectionStrings__DefaultConnection: "Server=host.docker.internal;Database=PlantClinicDB;User Id=YOUR_DB_USER;Password=YOUR_DB_PASSWORD;Encrypt=False;TrustServerCertificate=True;MultipleActiveResultSets=true"
+      PythonApi__BaseUrl: "http://ml-serve:8000"
+      RabbitMQ__ConnectionString: "amqp://***REMOVED***@rabbitmq:5672/"
+      RabbitMQ__QueueName: "bitkiklinik.retrain"
+    ports:
+      - "5000:5000"
+    volumes:
+      - ./BitkiKlinik.API/wwwroot/uploads:/app/wwwroot/uploads
+      - ./BitkiKlinik.API/keys:/root/.aspnet/DataProtection-Keys
+    networks:
+      - bitkiklinik-net
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+      ml-serve:
+        condition: service_started
+    restart: unless-stopped
+
+# ── Volumes ──────────────────────────────────────────────────────────────────
+volumes:
+  sqlserver_data:
+    name: bitkiklinik_sqlserver_data
+  rabbitmq_data:
+    name: bitkiklinik_rabbitmq_data
+
+# ── Networks ─────────────────────────────────────────────────────────────────
+networks:
+  bitkiklinik-net:
+    name: bitkiklinik-net
+    driver: bridge

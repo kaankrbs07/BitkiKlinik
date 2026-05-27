@@ -17,3 +17,6 @@ tqdm
 fastapi
 uvicorn[standard]
 python-multipart
+
+# RabbitMQ Worker (retrain_worker.py)
+pika>=1.3.2

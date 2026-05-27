@@ -1,0 +1,19 @@
+# ML Servisi — .dockerignore
+venv/
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+.env
+*.egg-info/
+dist/
+build/
+.pytest_cache/
+.mypy_cache/
+Dependencies.zip
+pyrefly.toml
+
+# Model dosyalarını build context'e dahil etme (volume'dan gelir)
+outputs/
+data/

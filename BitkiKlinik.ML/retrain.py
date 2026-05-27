@@ -52,8 +52,24 @@ def retrain_model(progress_callback=None):
                     if fname.lower().endswith(('.png', '.jpg', '.jpeg', '.webp')):
                         all_samples.append((os.path.join(label_dir, fname), class_idx))
                         
+    # ── Minimum Örnek Sayısı Kontrolü ────────────────────────────────────
+    # Model fine-tuning'in anlamlı sonuç vermesi için en az MIN_SAMPLES
+    # etiketlenmiş görsele ihtiyaç vardır. Bu değerin altında eğitim
+    # başlatmak aşırı öğrenmeye (overfitting) yol açar.
+    MIN_SAMPLES = 30
+
     if not all_samples:
-        raise ValueError("Yeniden eğitim için aktif öğrenme veri setinde hiç görsel bulunamadı.")
+        raise ValueError(
+            "Yeniden eğitim için aktif öğrenme veri setinde hiç görsel bulunamadı. "
+            "Lütfen önce admin panelinden en az 1 teşhisi doğrulayın."
+        )
+
+    if len(all_samples) < MIN_SAMPLES:
+        raise ValueError(
+            f"Yetersiz aktif öğrenme verisi: {len(all_samples)} görsel mevcut, "
+            f"yeniden eğitim için en az {MIN_SAMPLES} doğrulanmış görsel gereklidir. "
+            f"({MIN_SAMPLES - len(all_samples)} görsel daha gerekiyor)"
+        )
         
     # Shuffle and split
     import random

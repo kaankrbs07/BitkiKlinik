@@ -62,11 +62,27 @@ export default function ActiveLearningScreen() {
   const [searchQuery, setSearchQuery] = useState('');
   const [isResolving, setIsResolving] = useState(false);
 
+  // Minimum örnek sayısı eşiği
+  const MIN_SAMPLES_REQUIRED = 30;
+
   // Yeniden eğitimi tetikle
   const handleRetrain = () => {
+    // Önce istemci tarafında örnek sayısı kontrolü
+    const totalSamples = retrainStatus?.totalSamples ?? 0;
+    if (totalSamples < MIN_SAMPLES_REQUIRED) {
+      Alert.alert(
+        'Yetersiz Veri',
+        `Yeniden eğitim için en az ${MIN_SAMPLES_REQUIRED} doğrulanmış görsel gereklidir.\n\n` +
+        `Şu anda: ${totalSamples} görsel\nEksik: ${MIN_SAMPLES_REQUIRED - totalSamples} görsel\n\n` +
+        `Daha fazla teşhisi inceleyip onaylayarak veri setini büyütebilirsiniz.`,
+        [{ text: 'Anladım', style: 'default' }]
+      );
+      return;
+    }
+
     Alert.alert(
       'Yeniden Eğitimi Başlat',
-      'Aktif öğrenme veri setindeki yeni görsellerle modeli dondurulmuş transfer öğrenme yöntemiyle eğitmeyi başlatmak istiyor musunuz? Bu işlem arka planda çalışacaktır.',
+      `Aktif öğrenme veri setindeki ${totalSamples} görsellerle modeli dondurulmuş transfer öğrenme yöntemiyle eğitmeyi başlatmak istiyor musunuz? Bu işlem arka planda çalışacaktır.`,
       [
         { text: 'İptal', style: 'cancel' },
         {
@@ -186,50 +202,107 @@ export default function ActiveLearningScreen() {
             </View>
           </View>
 
-          {/* Eğitim Durum Paneli */}
+          {/* ── Yetersiz Veri Uyarı Banner'ı ─────────────────────────── */}
+          {retrainStatus && retrainStatus.totalSamples < MIN_SAMPLES_REQUIRED && retrainStatus.status !== 'training' && (
+            <Animated.View entering={FadeInDown.delay(100).duration(600)} style={s.insufficientDataBanner}>
+              <View style={s.insufficientDataHeader}>
+                <View style={s.insufficientDataIcon}>
+                  <Ionicons name="warning" size={20} color="#d97706" />
+                </View>
+                <View style={{ flex: 1, marginLeft: 10 }}>
+                  <Text style={s.insufficientDataTitle}>Yetersiz Eğitim Verisi</Text>
+                  <Text style={s.insufficientDataSubtitle}>
+                    Model eğitimi için en az {MIN_SAMPLES_REQUIRED} doğrulanmış görsel gereklidir.
+                  </Text>
+                </View>
+              </View>
+
+              {/* Örnek sayısı ilerleme çubuğu */}
+              <View style={s.sampleProgressContainer}>
+                <View style={s.sampleProgressTrack}>
+                  <View
+                    style={[
+                      s.sampleProgressFill,
+                      {
+                        width: `${Math.min((retrainStatus.totalSamples / MIN_SAMPLES_REQUIRED) * 100, 100)}%`,
+                        backgroundColor: retrainStatus.totalSamples >= MIN_SAMPLES_REQUIRED ? C.emerald : '#f59e0b',
+                      },
+                    ]}
+                  />
+                </View>
+                <Text style={s.sampleProgressText}>
+                  {retrainStatus.totalSamples} / {MIN_SAMPLES_REQUIRED}
+                </Text>
+              </View>
+
+              <Text style={s.insufficientDataHint}>
+                💡 Daha fazla teşhisi inceleyip onaylayarak{' '}
+                <Text style={{ fontWeight: '700' }}>
+                  {MIN_SAMPLES_REQUIRED - retrainStatus.totalSamples} görsel
+                </Text>{' '}
+                daha ekleyebilirsiniz.
+              </Text>
+            </Animated.View>
+          )}
+
+          {/* ── Eğitim Durum Paneli ───────────────────────────────────── */}
           {retrainStatus && (
             <Animated.View entering={FadeInDown.duration(600)} style={s.trainingPanel}>
               <View style={s.panelHeader}>
                 <Ionicons
-                  name={retrainStatus.status === 'training' ? 'cog' : 'bulb'}
+                  name={retrainStatus.status === 'training' ? 'cog' : retrainStatus.status === 'error' ? 'alert-circle' : 'bulb'}
                   size={24}
-                  color={retrainStatus.status === 'training' ? C.primary : C.amber}
+                  color={
+                    retrainStatus.status === 'training' ? C.primary
+                    : retrainStatus.status === 'error' ? C.rose
+                    : C.amber
+                  }
                   style={retrainStatus.status === 'training' ? s.spinning : undefined}
                 />
                 <View style={{ flex: 1, marginLeft: 12 }}>
                   <Text style={s.panelTitle}>Yapay Zeka Eğitim Durumu</Text>
-                  <Text style={s.panelSubtitle}>
+                  <Text style={[
+                    s.panelSubtitle,
+                    retrainStatus.status === 'error' ? { color: C.rose } : undefined,
+                  ]}>
                     {retrainStatus.status === 'training'
                       ? `Model eğitiliyor... %${Math.round(retrainStatus.progress * 100)}`
                       : retrainStatus.status === 'success'
-                      ? 'Eğitim başarıyla tamamlandı'
+                      ? '✓ Eğitim başarıyla tamamlandı'
                       : retrainStatus.status === 'error'
-                      ? 'Eğitim sırasında hata oluştu'
-                      : 'Model güncel'}
+                      ? `⚠ Hata: ${retrainStatus.error ?? 'Eğitim sırasında hata oluştu'}`
+                      : 'Model güncel ve hazır'}
                   </Text>
                 </View>
                 {retrainStatus.status !== 'training' && (
                   <TouchableOpacity
                     style={[
                       s.retrainBtn,
-                      isRetrainingLoading || (!retrainStatus || retrainStatus.currentSamples === 0) ? s.btnDisabled : undefined,
+                      (isRetrainingLoading || retrainStatus.totalSamples < MIN_SAMPLES_REQUIRED) ? s.btnDisabled : undefined,
                     ]}
                     onPress={handleRetrain}
-                    disabled={isRetrainingLoading || (!retrainStatus || retrainStatus.currentSamples === 0)}
+                    disabled={isRetrainingLoading || retrainStatus.totalSamples < MIN_SAMPLES_REQUIRED}
                   >
                     {isRetrainingLoading ? (
                       <ActivityIndicator size="small" color={C.white} />
                     ) : (
                       <>
-                        <Ionicons name="play" size={16} color={C.white} />
-                        <Text style={s.retrainBtnTxt}>Eğit</Text>
+                        <Ionicons
+                          name="play"
+                          size={16}
+                          color={retrainStatus.totalSamples < MIN_SAMPLES_REQUIRED ? '#94a3b8' : C.white}
+                        />
+                        <Text style={[
+                          s.retrainBtnTxt,
+                          retrainStatus.totalSamples < MIN_SAMPLES_REQUIRED ? { color: '#94a3b8' } : undefined,
+                        ]}>Eğit</Text>
                       </>
                     )}
                   </TouchableOpacity>
                 )}
               </View>
 
-              {/* Progress Bar */}
+              {/* Eğitim İlerleme Çubuğu */}
               {retrainStatus.status === 'training' && (
                 <View style={s.progressContainer}>
                   <View style={s.progressBarBg}>
@@ -244,11 +317,11 @@ export default function ActiveLearningScreen() {
                 <View style={{ flexDirection: 'column', gap: 6 }}>
                   <View style={s.footerInfo}>
                     <Ionicons name="sparkles-outline" size={15} color={C.emerald} />
-                    <Text style={s.footerInfoTxt}>Güncel Görsel (Yeni): {retrainStatus.currentSamples}</Text>
+                    <Text style={s.footerInfoTxt}>Yeni Görsel: {retrainStatus.currentSamples}</Text>
                   </View>
                   <View style={s.footerInfo}>
                     <Ionicons name="images-outline" size={15} color={C.slateLight} />
-                    <Text style={s.footerInfoTxt}>Toplam Görsel (Arşiv): {retrainStatus.totalSamples}</Text>
+                    <Text style={s.footerInfoTxt}>Toplam Görsel: {retrainStatus.totalSamples}</Text>
                   </View>
                 </View>
                 {retrainStatus.lastTrainedAt && (
@@ -536,6 +609,74 @@ const s = StyleSheet.create({
   },
   retrainBtnTxt: { color: C.white, fontSize: 12, fontWeight: 'bold' },
   btnDisabled: { opacity: 0.5 },
+
+  // Yetersiz Veri Banner Stilleri
+  insufficientDataBanner: {
+    backgroundColor: '#fffbeb',
+    borderRadius: 16,
+    padding: 16,
+    marginBottom: 12,
+    borderWidth: 1,
+    borderColor: '#fde68a',
+    shadowColor: '#f59e0b',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.08,
+    shadowRadius: 6,
+    elevation: 2,
+  },
+  insufficientDataHeader: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    marginBottom: 12,
+  },
+  insufficientDataIcon: {
+    width: 36,
+    height: 36,
+    borderRadius: 10,
+    backgroundColor: '#fef3c7',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  insufficientDataTitle: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: '#92400e',
+    marginBottom: 2,
+  },
+  insufficientDataSubtitle: {
+    fontSize: 12,
+    color: '#b45309',
+    lineHeight: 17,
+  },
+  sampleProgressContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    marginBottom: 10,
+  },
+  sampleProgressTrack: {
+    flex: 1,
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: '#fde68a',
+    overflow: 'hidden',
+  },
+  sampleProgressFill: {
+    height: '100%',
+    borderRadius: 4,
+  },
+  sampleProgressText: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#b45309',
+    minWidth: 40,
+    textAlign: 'right',
+  },
+  insufficientDataHint: {
+    fontSize: 12,
+    color: '#92400e',
+    lineHeight: 18,
+  },
   spinning: {
     // Note: React Native style spinning animation is typically done via Animated.timing,
     // but in pure style we can just keep it neat

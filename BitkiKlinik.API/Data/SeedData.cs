@@ -16,6 +16,7 @@ public static class SeedData
     public static async Task InitialiseAsync(ApplicationDbContext db)
     {
         // ── 0. KULLANICI YETKİLENDİRME (Admin Yetkisi) ─────────────────────
+
         // Id'si 3 olan kullanıcıyı bul ve Admin yap
         var adminUser = await db.Users.FindAsync(3);
         if (adminUser != null && adminUser.Role != UserRole.Admin)

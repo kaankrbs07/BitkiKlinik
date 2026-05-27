@@ -47,6 +47,8 @@ MODEL_FP32_PATH = OUTPUT_DIR / "efficientnet_b0_plant.pt"         # TorchScript 
 MODEL_INT8_PATH = OUTPUT_DIR / "efficientnet_b0_plant.quant.pt"   # INT8 (CPU)
 CLASS_MAP_PATH  = OUTPUT_DIR / "class_map.json"
 META_PATH       = OUTPUT_DIR / "active_learning_meta.json"
+# Worker yeniden eğitim durumunu bu dosyaya yazar (retrain_worker.py)
+RETRAIN_STATE_PATH = OUTPUT_DIR / "retrain_state.json"
 
 # ─────────────────────────────────────────────
 #  ACTIVE LEARNING METADATA HELPERS
@@ -436,12 +438,15 @@ async def retrain():
 def retrain_status():
     """
     Yeniden eğitim durumunu ve aktif öğrenme veri seti istatistiklerini döner.
+
+    Önce retrain_worker.py'nin yazdığı durum dosyasını kontrol eder.
+    Dosya yoksa kendi iç state dict'ini kullanır (doğrudan retrain endpoint'i çağrıldıysa).
     """
     samples_breakdown = {}
-    total_samples = 0
-    current_samples = 0
-    data_dir = Path("data/active_learning")
-    trained_files = set(state.get("trained_files", []))
+    total_samples     = 0
+    current_samples   = 0
+    data_dir          = Path("data/active_learning")
+    trained_files     = set(state.get("trained_files", []))
 
     if data_dir.exists():
         for label in os.listdir(data_dir):
@@ -457,12 +462,29 @@ def retrain_status():
                         if rel_path not in trained_files:
                             current_samples += 1
 
+    # ── Worker'dan Durum Oku (RabbitMQ mimarisi) ───────────────────────────
+    # retrain_worker.py bağımsız çalışıyorsa bu dosya yazar; inference sunucusu yok.
+    worker_status = None
+    if RETRAIN_STATE_PATH.exists():
+        try:
+            with RETRAIN_STATE_PATH.open("r", encoding="utf-8") as f:
+                worker_status = json.load(f)
+        except Exception as e:
+            logger.error(f"Worker durum dosyası okunurken hata: {e}")
+
+    # Worker durumu varsa ona göre, yoksa iç state'e göre yanıt üret
+    active_status = worker_status or {}
+    final_status   = active_status.get("status", state["training_status"])
+    final_progress = active_status.get("progress", state["training_progress"])
+    final_error    = active_status.get("error", state["training_error"])
+    final_trained  = active_status.get("lastTrainedAt", state["last_trained_at"])
+
     return JSONResponse(content={
-        "status": state["training_status"],
-        "progress": round(state["training_progress"], 4),
-        "error": state["training_error"],
-        "lastTrainedAt": state["last_trained_at"],
-        "totalSamples": total_samples,
-        "currentSamples": current_samples,
+        "status"          : final_status,
+        "progress"        : round(final_progress, 4),
+        "error"           : final_error,
+        "lastTrainedAt"   : final_trained,
+        "totalSamples"    : total_samples,
+        "currentSamples"  : current_samples,
         "samplesBreakdown": samples_breakdown
     })
