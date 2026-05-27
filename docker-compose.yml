@@ -20,7 +20,7 @@ services:
     image: mcr.microsoft.com/mssql/server:2022-latest
     container_name: bitkiklinik-sqlserver
     environment:
-      SA_PASSWORD: "YOUR_PASSWORD"
+      SA_PASSWORD: "***REMOVED***"
       ACCEPT_EULA: "Y"
       MSSQL_PID: "Express"
     ports:
@@ -31,7 +31,7 @@ services:
       - bitkiklinik-net
     restart: unless-stopped
     healthcheck:
-      test: ["CMD-SHELL", "/opt/mssql-tools18/bin/sqlcmd -S localhost -U sa -P YOUR_PASSWORD -Q 'SELECT 1' -C || exit 1"]
+      test: ["CMD-SHELL", "/opt/mssql-tools18/bin/sqlcmd -S localhost -U sa -P ***REMOVED*** -Q 'SELECT 1' -C || exit 1"]
       interval: 15s
       timeout: 10s
       retries: 10
@@ -130,10 +130,19 @@ services:
     environment:
       ASPNETCORE_ENVIRONMENT: Production
       ASPNETCORE_URLS: "http://+:5000"
-      ConnectionStrings__DefaultConnection: "Server=host.docker.internal;Database=PlantClinicDB;User Id=YOUR_USER;Password=YOUR_PASSWORD;Encrypt=False;TrustServerCertificate=True;MultipleActiveResultSets=true"
+      ConnectionStrings__DefaultConnection: "Server=host.docker.internal;Database=PlantClinicDB;User Id=${DB_USER};Password=${DB_PASSWORD};Encrypt=False;TrustServerCertificate=True;MultipleActiveResultSets=true"
       PythonApi__BaseUrl: "http://ml-serve:8000"
       RabbitMQ__ConnectionString: "amqp://***REMOVED***@rabbitmq:5672/"
       RabbitMQ__QueueName: "bitkiklinik.retrain"
+      Jwt__Key: "${JWT_KEY}"
+      Gemini__ApiKey: "${GEMINI_API_KEY}"
+      SMTP__Password: "${SMTP_PASSWORD}"
+      SMTP__SenderEmail: "${SMTP_USERNAME}"
+      SMTP__Username: "${SMTP_USERNAME}"
+      FileStorage__Backblaze__BucketName: "${B2_BUCKET_NAME}"
+      FileStorage__Backblaze__Endpoint: "${B2_ENDPOINT}"
+      FileStorage__Backblaze__KeyId: "${B2_KEY_ID}"
+      FileStorage__Backblaze__ApplicationKey: "${B2_APPLICATION_KEY}"
     ports:
       - "5000:5000"
     volumes:

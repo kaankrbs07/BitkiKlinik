@@ -82,11 +82,15 @@ public class GeminiService : IGeminiService
         int maxRetries = 3;
         int delayMs = 1500; // 1.5 saniye başlangıç gecikmesi
 
-        // Hata durumunda sırasıyla denenecek model zinciri
-        var modelsToTry = new List<string> { _model };
-        if (_model != "gemini-3.5-flash") modelsToTry.Add("gemini-3.5-flash");
-        if (_model != "gemini-3-flash") modelsToTry.Add("gemini-3-flash");
-        modelsToTry.Add("gemini-3.0-flash"); // Farklı API sürümleriyle uyumluluk için alternatif isim
+        // Hata durumunda sırasıyla denenecek model zinciri: Gemini 3.5 Flash -> Gemini 3 Flash -> Gemini 2.5 Flash
+        var modelsToTry = new List<string>();
+        var preferredOrder = new List<string> { "gemini-3.5-flash", "gemini-3-flash", "gemini-2.5-flash" };
+
+        if (!preferredOrder.Contains(_model) && !string.IsNullOrEmpty(_model))
+        {
+            modelsToTry.Add(_model);
+        }
+        modelsToTry.AddRange(preferredOrder);
 
         for (int attempt = 1; attempt <= maxRetries; attempt++)
         {

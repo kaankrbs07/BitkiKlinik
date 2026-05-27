@@ -63,71 +63,112 @@ public class DiseaseRiskForecastingService : BackgroundService
     {
         _logger.LogInformation("Kullanıcılar için tarımsal risk tahminleri hesaplanıyor...");
 
-        await using var scope = _services.CreateAsyncScope();
-        var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
-        var weatherService = scope.ServiceProvider.GetRequiredService<IWeatherService>();
-
-        // Konum bilgisi tanımlı olan kullanıcıları buluyoruz
-        var users = await db.Users
-            .Where(u => u.Latitude != null && u.Longitude != null)
-            .ToListAsync(stoppingToken);
+        // 1. Konumlu kullanıcıları hafif bir DTO listesi halinde AsNoTracking() ile ve kısa süreli bir scope içinde çekiyoruz.
+        // Bu sayede veritabanı bağlantısı dış API döngüsü başlamadan hemen önce serbest bırakılır.
+        List<UserLocationDto> users;
+        await using (var scope = _services.CreateAsyncScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+            users = await db.Users
+                .Where(u => u.Latitude != null && u.Longitude != null)
+                .Select(u => new UserLocationDto(
+                    u.Id,
+                    u.Username,
+                    u.Latitude!.Value,
+                    u.Longitude!.Value,
+                    u.ExpoPushToken
+                ))
+                .AsNoTracking()
+                .ToListAsync(stoppingToken);
+        }
 
         _logger.LogInformation("{Count} adet konumlu kullanıcı tespit edildi.", users.Count);
 
-        foreach (var user in users)
+        if (!users.Any()) return;
+
+        var alertsToSave = new List<DiseaseRiskAlert>();
+        var pushNotificationsToEnqueue = new List<(string PushToken, float RiskPercentage, string Suggestion)>();
+
+        // 2. Dış hava durumu Open-Meteo API çağrılarını içeren döngüyü sıfır DB bağlantısı ile çalıştırıyoruz.
+        await using (var scope = _services.CreateAsyncScope())
         {
-            if (stoppingToken.IsCancellationRequested) break;
+            var weatherService = scope.ServiceProvider.GetRequiredService<IWeatherService>();
 
-            try
+            foreach (var user in users)
             {
-                _logger.LogInformation("Kullanıcı {UserId} ({Username}) için tahmin alınıyor. Konum: {Lat}, {Lon}",
-                    user.Id, user.Username, user.Latitude, user.Longitude);
+                if (stoppingToken.IsCancellationRequested) break;
 
-                var forecast = await weatherService.GetHourlyForecastAsync(user.Latitude!.Value, user.Longitude!.Value);
-                if (forecast == null)
+                try
                 {
-                    _logger.LogWarning("Kullanıcı {UserId} için hava tahmini çekilemedi.", user.Id);
-                    continue;
+                    _logger.LogInformation("Kullanıcı {UserId} ({Username}) için tahmin alınıyor. Konum: {Lat}, {Lon}",
+                        user.Id, user.Username, user.Latitude, user.Longitude);
+
+                    var forecast = await weatherService.GetHourlyForecastAsync(user.Latitude, user.Longitude);
+                    if (forecast == null)
+                    {
+                        _logger.LogWarning("Kullanıcı {UserId} için hava tahmini çekilemedi.", user.Id);
+                        continue;
+                    }
+
+                    var (riskPercentage, riskLevel, suggestion) = DiseaseRiskCalculator.CalculateMildewRisk(forecast);
+
+                    _logger.LogInformation("Hesaplanan Risk: %{Risk} ({Level})", riskPercentage, riskLevel);
+
+                    // Son güncel riski geçici listeye ekle
+                    var alert = new DiseaseRiskAlert
+                    {
+                        UserId = user.Id,
+                        DiseaseName = "Mildiyö (Geç Yanıklık)",
+                        RiskPercentage = riskPercentage,
+                        RiskLevel = riskLevel,
+                        Suggestion = suggestion,
+                        CalculatedAt = DateTime.UtcNow
+                    };
+
+                    alertsToSave.Add(alert);
+
+                    // Eğer risk kritikse ve push token varsa, kuyruklanacak bildirimler listesine ekle
+                    if (riskPercentage >= 75.0f && !string.IsNullOrEmpty(user.ExpoPushToken))
+                    {
+                        pushNotificationsToEnqueue.Add((user.ExpoPushToken, riskPercentage, suggestion));
+                    }
                 }
-
-                var (riskPercentage, riskLevel, suggestion) = DiseaseRiskCalculator.CalculateMildewRisk(forecast);
-
-                _logger.LogInformation("Hesaplanan Risk: %{Risk} ({Level})", riskPercentage, riskLevel);
-
-                // Son güncel riski veritabanına kaydet
-                var alert = new DiseaseRiskAlert
+                catch (Exception ex)
                 {
-                    UserId = user.Id,
-                    DiseaseName = "Mildiyö (Geç Yanıklık)",
-                    RiskPercentage = riskPercentage,
-                    RiskLevel = riskLevel,
-                    Suggestion = suggestion,
-                    CalculatedAt = DateTime.UtcNow
-                };
-
-                db.DiseaseRiskAlerts.Add(alert);
-                await db.SaveChangesAsync(stoppingToken);
-
-                // Eğer risk kritikse (>= 75%) ve kullanıcının push token'ı tanımlıysa
-                // Hangfire kuyruğuna push bildirimi işi ekle — doğrudan HTTP yerine.
-                // Bu sayede:
-                //   - Ana döngü bloklanmaz (10.000 kullanıcı için bile akıcı çalışır)
-                //   - Başarısız bildirimler otomatik yeniden denenir (PushNotificationJob AutomaticRetry)
-                //   - Hangfire Dashboard'dan her bildirim izlenebilir
-                if (riskPercentage >= 75.0f && !string.IsNullOrEmpty(user.ExpoPushToken))
-                {
-                    BackgroundJob.Enqueue<IPushNotificationJob>(
-                        job => job.SendAsync(user.ExpoPushToken, riskPercentage, suggestion));
-
-                    _logger.LogInformation(
-                        "Push bildirimi Hangfire kuyruğuna eklendi. UserId: {UserId}", user.Id);
+                    _logger.LogError(ex, "Kullanıcı {UserId} için tarımsal risk hesaplanırken hata oluştu.", user.Id);
                 }
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "Kullanıcı {UserId} için tarımsal risk hesaplanırken hata oluştu.", user.Id);
             }
         }
+
+        // 3. Toplu yazma (Batching): Tüm risk uyarılarını tek bir SaveChangesAsync() ile veritabanına kaydediyoruz.
+        if (alertsToSave.Any())
+        {
+            _logger.LogInformation("{Count} adet tarımsal risk uyarısı toplu olarak kaydediliyor...", alertsToSave.Count);
+            
+            await using (var scope = _services.CreateAsyncScope())
+            {
+                var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+                await db.DiseaseRiskAlerts.AddRangeAsync(alertsToSave, stoppingToken);
+                await db.SaveChangesAsync(stoppingToken);
+            }
+
+            // 4. Başarıyla kaydedilen riskler için Hangfire push bildirimlerini kuyruğa al
+            foreach (var push in pushNotificationsToEnqueue)
+            {
+                BackgroundJob.Enqueue<IPushNotificationJob>(
+                    job => job.SendAsync(push.PushToken, push.RiskPercentage, push.Suggestion));
+            }
+
+            _logger.LogInformation("Tüm tarımsal risk uyarıları kaydedildi ve {PushCount} adet push bildirimi kuyruğa alındı.", pushNotificationsToEnqueue.Count);
+        }
     }
+
+    private record UserLocationDto(
+        int Id,
+        string Username,
+        double Latitude,
+        double Longitude,
+        string? ExpoPushToken
+    );
 }
 

@@ -2,6 +2,11 @@
 # BitkiKlinik Projesi Kapsamlı .gitignore
 # ==========================================
 
+# ── 0. GÜVENLİK VE ORTAM DEĞİŞKENLERİ (.env) ──
+.env
+.env.local
+.env.*
+
 # ── 1. İŞLETİM SİSTEMİ DOSYALARI (OS Files) ──
 Thumbs.db
 ehthumbs.db
@@ -31,7 +36,6 @@ out/
 **/App_Data/*.mdf
 **/wwwroot/uploads/*
 !**/wwwroot/uploads/.gitkeep
-**/appsettings.json
 **/appsettings.Development.json
 **/BitkiKlinik.API/keys/
 *.db

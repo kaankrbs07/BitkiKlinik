@@ -260,8 +260,10 @@ public class ChatController : ControllerBase
                 .AsNoTracking()
                 .ToListAsync();
 
-            // sessionMeta sırasına göre oturumları oluştur
-            var lastMsgBySession = lastMessages.ToDictionary(m => m.SessionId);
+            // sessionMeta sırasına göre oturumları oluştur (Milisaniye çakışmalarını önlemek için gruplayarak tekilleştiriyoruz)
+            var lastMsgBySession = lastMessages
+                .GroupBy(m => m.SessionId)
+                .ToDictionary(g => g.Key, g => g.First());
 
             var sessions = sessionMeta
                 .Where(s => lastMsgBySession.ContainsKey(s.SessionId))
