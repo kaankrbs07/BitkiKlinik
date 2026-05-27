@@ -46,7 +46,26 @@ function getTitle(severity: ErrorSeverity, custom?: string): string {
 
 /** Axios hata nesnesinden kullanıcı dostu mesaj çıkarır. */
 export function getErrorMessage(error: any): string {
-  // Önce backend'den gelen mesajı kontrol et
+  // 1. Önce ASP.NET Core ve benzeri validation errors nesnesini kontrol et
+  if (error?.response?.data?.errors) {
+    const errorsObj = error.response.data.errors;
+    const messages: string[] = [];
+    for (const key in errorsObj) {
+      if (Object.prototype.hasOwnProperty.call(errorsObj, key)) {
+        const val = errorsObj[key];
+        if (Array.isArray(val)) {
+          messages.push(...val);
+        } else if (typeof val === 'string') {
+          messages.push(val);
+        }
+      }
+    }
+    if (messages.length > 0) {
+      return messages.join('\n');
+    }
+  }
+
+  // 2. Ardından backend'den gelen tekil mesajları kontrol et
   const backendMsg =
     error?.response?.data?.Message ||
     error?.response?.data?.message ||
