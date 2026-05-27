@@ -62,4 +62,26 @@ public class ActiveLearningController : ControllerBase
         var result = await _activeLearningService.TriggerRetrainAsync();
         return Ok(result);
     }
+
+    [AllowAnonymous]
+    [HttpPost("webhook/retrain-success")]
+    public IActionResult RetrainSuccessWebhook()
+    {
+        _logger.LogInformation("Python ML Servisinden yeniden eğitim başarı bildirimi alındı (Webhook).");
+        
+        // Sunucu yanıtını bloke etmemek için yedeklemeyi arka planda (Fire-and-Forget) çalıştırıyoruz
+        _ = Task.Run(async () =>
+        {
+            try
+            {
+                await _activeLearningService.BackupModelToB2Async();
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Model bulut yedeklemesi arka plan görevi sırasında hata oluştu.");
+            }
+        });
+
+        return Ok(new { message = "Webhook alındı, yedekleme işlemi arka planda başlatıldı." });
+    }
 }

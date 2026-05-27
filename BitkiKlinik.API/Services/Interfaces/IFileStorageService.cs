@@ -23,6 +23,37 @@ public interface IFileStorageService
     void DeleteFile(string relativeUrl);
 
     /// <summary>
+    /// Belirtilen göreli URL'e göre tam veya geçici erişim URL'ini döndürür.
+    /// Yerel depolamada doğrudan göreli URL dönerken,
+    /// bulut depolamalarda (örn: Backblaze B2) geçici imzalı (pre-signed) URL döner.
+    /// </summary>
+    /// <param name="relativeUrl">Dosyanın göreli URL'i (ör: /uploads/profiles/abc.jpg veya profiles/abc.jpg)</param>
+    /// <returns>İmzalı veya tam erişim URL'i</returns>
+    string GetFileUrl(string? relativeUrl);
+
+    /// <summary>
+    /// Yerel depolamadaki (wwwroot/uploads) eski dosyaları otomatik olarak bulut depolamaya taşır (idempotent).
+    /// </summary>
+    /// <param name="webRootPath">Sunucunun web root dizin yolu (wwwroot)</param>
+    Task MigrateLocalFilesAsync(string webRootPath);
+
+    /// <summary>
+    /// Belirtilen dosya yolundaki dosyanın byte verilerini asenkron olarak okur.
+    /// </summary>
+    /// <param name="relativeUrl">Dosyanın göreli URL'i</param>
+    /// <returns>Dosya byte'ları veya dosya bulunamazsa null</returns>
+    Task<byte[]?> GetFileBytesAsync(string? relativeUrl);
+
+    /// <summary>
+    /// Byte dizisi halindeki dosya verisini depolama alanına kaydeder.
+    /// </summary>
+    /// <param name="fileBytes">Dosyanın byte verisi</param>
+    /// <param name="fileName">Dosya adı (uzantısıyla birlikte)</param>
+    /// <param name="subDirectory">Hedef alt dizin (ör: "profiles", "scans")</param>
+    /// <returns>Kaydedilen dosyanın göreli URL'i</returns>
+    Task<string> SaveFileBytesAsync(byte[] fileBytes, string fileName, string subDirectory);
+
+    /// <summary>
     /// Dosyanın uzantı ve boyut kurallarına uygunluğunu doğrular.
     /// Uygun değilse ArgumentException fırlatır.
     /// </summary>

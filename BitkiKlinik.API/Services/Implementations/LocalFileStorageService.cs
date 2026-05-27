@@ -118,4 +118,67 @@ public class LocalFileStorageService : IFileStorageService
             _logger.LogWarning("Silinecek dosya bulunamadı → {Path}", physicalPath);
         }
     }
+
+    /// <inheritdoc />
+    public string GetFileUrl(string? relativeUrl)
+    {
+        if (string.IsNullOrWhiteSpace(relativeUrl))
+            return string.Empty;
+
+        // Yerel depolamada göreli URL'in kendisini döner.
+        // Eğer "/" ile başlamıyorsa, başına "/" ekleriz.
+        return relativeUrl.StartsWith('/') ? relativeUrl : $"/{relativeUrl}";
+    }
+
+    /// <inheritdoc />
+    public Task MigrateLocalFilesAsync(string webRootPath)
+    {
+        // Yerel depolamada zaten yerel dosyalar kullanılmaktadır, işlem yapmaya gerek yoktur.
+        return Task.CompletedTask;
+    }
+
+    /// <inheritdoc />
+    public async Task<byte[]?> GetFileBytesAsync(string? relativeUrl)
+    {
+        if (string.IsNullOrWhiteSpace(relativeUrl))
+            return null;
+
+        var relativePath = relativeUrl.TrimStart('/');
+        var physicalPath = Path.Combine(_env.ContentRootPath, "wwwroot", relativePath);
+
+        if (File.Exists(physicalPath))
+        {
+            return await File.ReadAllBytesAsync(physicalPath);
+        }
+
+        return null;
+    }
+
+    /// <inheritdoc />
+    public async Task<string> SaveFileBytesAsync(byte[] fileBytes, string fileName, string subDirectory)
+    {
+        if (fileBytes == null || fileBytes.Length == 0)
+            throw new ArgumentException("Yazılacak dosya verisi boş olamaz.");
+
+        // Fiziksel hedef klasörü oluştur
+        var physicalFolder = Path.Combine(_env.ContentRootPath, _basePath, subDirectory);
+        Directory.CreateDirectory(physicalFolder);
+
+        // Benzersiz dosya adı üret
+        var extension = Path.GetExtension(fileName).ToLowerInvariant();
+        if (string.IsNullOrEmpty(extension))
+        {
+            extension = ".jpg";
+        }
+        var uniqueName = $"{Guid.NewGuid()}{extension}";
+        var fullPath = Path.Combine(physicalFolder, uniqueName);
+
+        // Byte dizisini diske yaz
+        await File.WriteAllBytesAsync(fullPath, fileBytes);
+
+        var relativeUrl = $"/uploads/{subDirectory}/{uniqueName}";
+        _logger.LogInformation("Dosya byte'ları diske kaydedildi → Fiziksel: {Path}, URL: {Url}", fullPath, relativeUrl);
+
+        return relativeUrl;
+    }
 }

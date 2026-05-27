@@ -45,7 +45,18 @@ builder.Services.AddScoped<ITokenService, TokenService>();
 builder.Services.AddScoped<IEmailService, EmailService>();
 builder.Services.AddScoped<IPasswordHasher, BcryptPasswordHasher>();
 builder.Services.AddScoped<IPlantAnalysisService, PlantAnalysisService>();
-builder.Services.AddSingleton<IFileStorageService, LocalFileStorageService>();
+
+// Depolama sağlayıcısına göre uygun servisi register ediyoruz
+var storageProvider = builder.Configuration["FileStorage:Provider"];
+if (storageProvider == "Backblaze")
+{
+    builder.Services.AddSingleton<IFileStorageService, B2FileStorageService>();
+}
+else
+{
+    builder.Services.AddSingleton<IFileStorageService, LocalFileStorageService>();
+}
+
 builder.Services.AddScoped<IProfileService, ProfileService>();
 builder.Services.AddScoped<IDashboardService, DashboardService>();
 builder.Services.AddScoped<IScanService, ScanService>();
@@ -156,6 +167,24 @@ using (var scope = app.Services.CreateScope())
     await SeedData.InitialiseAsync(db);
 }
 
+// ── Yerel Dosyaları Buluta Taşıma (Storage Migration) ────────────────────────
+// Backblaze B2 aktifse, yerel uploads altındaki tüm eski dosyaları otomatik buluta taşır (idempotent).
+using (var scope = app.Services.CreateScope())
+{
+    var storageService = scope.ServiceProvider.GetRequiredService<IFileStorageService>();
+    var webHostEnvironment = scope.ServiceProvider.GetRequiredService<IWebHostEnvironment>();
+    try
+    {
+        await storageService.MigrateLocalFilesAsync(webHostEnvironment.WebRootPath);
+    }
+    catch (Exception ex)
+    {
+        var logger = scope.ServiceProvider.GetRequiredService<ILogger<Program>>();
+        logger.LogError(ex, "Eski dosyalar Backblaze B2'ye taşınırken hata oluştu.");
+    }
+}
+
+
 app.UseMiddleware<GlobalExceptionMiddleware>();
 app.UseMiddleware<RequestResponseLoggingMiddleware>();
 
@@ -167,7 +196,15 @@ if (app.Environment.IsDevelopment())
 
 if (!app.Environment.IsDevelopment())
 {
-    app.UseHttpsRedirection();
+    // HTTPS redirection is only activated if an HTTPS port is configured or explicitly enabled.
+    // This avoids warnings and potential redirect loops when running in Docker or behind reverse proxies where SSL is terminated at the gateway.
+    var httpsPort = builder.Configuration["ASPNETCORE_HTTPS_PORT"] ?? builder.Configuration["HTTPS_PORT"];
+    var enableHttpsRedirection = builder.Configuration.GetValue<bool>("EnableHttpsRedirection", false);
+
+    if (!string.IsNullOrEmpty(httpsPort) || enableHttpsRedirection)
+    {
+        app.UseHttpsRedirection();
+    }
 }
 app.UseStaticFiles(); // wwwroot/uploads/scans altındaki görselleri serve eder
 
@@ -183,6 +220,25 @@ app.UseHangfireDashboard("/hangfire", new DashboardOptions
 {
     Authorization = [new Hangfire.Dashboard.LocalRequestsOnlyAuthorizationFilter()],
     DashboardTitle  = "BitkiKlinik Arka Plan İşleri"
+});
+
+// ── HTTP 302 Redirection Gateway for B2 Storage ──────────────────────────────
+// Yerel diskte bulunmayan (UseStaticFiles'dan pas geçen) görseller için
+// Backblaze B2 üzerinden anlık geçici imzalı link üretip tarayıcıyı/mobil uygulamayı oraya yönlendirir.
+app.MapGet("/uploads/{subDirectory}/{fileName}", (
+    string subDirectory,
+    string fileName,
+    IFileStorageService storageService) =>
+{
+    var relativePath = $"uploads/{subDirectory}/{fileName}";
+    var targetUrl = storageService.GetFileUrl(relativePath);
+    
+    if (!string.IsNullOrEmpty(targetUrl) && targetUrl.StartsWith("http", StringComparison.OrdinalIgnoreCase))
+    {
+        return Results.Redirect(targetUrl);
+    }
+    
+    return Results.NotFound();
 });
 
 app.MapControllers();

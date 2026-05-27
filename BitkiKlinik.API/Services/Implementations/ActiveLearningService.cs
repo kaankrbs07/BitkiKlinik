@@ -14,6 +14,7 @@ public class ActiveLearningService : IActiveLearningService
     private readonly IHttpClientFactory _httpClientFactory;
     private readonly IConfiguration _configuration;
     private readonly IWebHostEnvironment _env;
+    private readonly IFileStorageService _fileStorageService;
     private readonly ILogger<ActiveLearningService> _logger;
     private readonly IRetrainQueueService? _retrainQueueService;
 
@@ -22,6 +23,7 @@ public class ActiveLearningService : IActiveLearningService
         IHttpClientFactory httpClientFactory,
         IConfiguration configuration,
         IWebHostEnvironment env,
+        IFileStorageService fileStorageService,
         ILogger<ActiveLearningService> logger,
         IRetrainQueueService? retrainQueueService = null)
     {
@@ -29,6 +31,7 @@ public class ActiveLearningService : IActiveLearningService
         _httpClientFactory = httpClientFactory;
         _configuration = configuration;
         _env = env;
+        _fileStorageService = fileStorageService;
         _logger = logger;
         _retrainQueueService = retrainQueueService;
     }
@@ -37,34 +40,17 @@ public class ActiveLearningService : IActiveLearningService
     {
         try
         {
-            var relativeFolder = "uploads/active-learning";
-            var physicalFolder = Path.Combine(_env.ContentRootPath, "wwwroot", relativeFolder);
-            
-            if (!Directory.Exists(physicalFolder))
+            var fileBytes = await _fileStorageService.GetFileBytesAsync(imagePath);
+            string dbPath;
+            if (fileBytes != null)
             {
-                Directory.CreateDirectory(physicalFolder);
-            }
-
-            var extension = Path.GetExtension(imagePath).ToLowerInvariant();
-            if (string.IsNullOrEmpty(extension))
-            {
-                extension = ".jpg";
-            }
-            
-            var uniqueName = $"{Guid.NewGuid()}{extension}";
-            var physicalDest = Path.Combine(physicalFolder, uniqueName);
-
-            var physicalSource = GetPhysicalPath(imagePath);
-            if (File.Exists(physicalSource))
-            {
-                File.Copy(physicalSource, physicalDest, true);
+                dbPath = await _fileStorageService.SaveFileBytesAsync(fileBytes, imagePath, "active-learning");
             }
             else
             {
-                _logger.LogWarning("Aktif öğrenme için kaynak görsel fiziksel olarak bulunamadı: {Path}", physicalSource);
+                _logger.LogWarning("Aktif öğrenme için kaynak görsel depolama alanında bulunamadı: {Path}", imagePath);
+                dbPath = imagePath; // Fallback
             }
-
-            var dbPath = $"/uploads/active-learning/{uniqueName}";
 
             var queueItem = new ActiveLearningQueue
             {
@@ -171,20 +157,19 @@ public class ActiveLearningService : IActiveLearningService
         try
         {
             var client = _httpClientFactory.CreateClient("PythonApiClient");
-            var physicalPath = GetPhysicalPath(item.ImagePath);
+            var fileBytes = await _fileStorageService.GetFileBytesAsync(item.ImagePath);
 
-            if (!File.Exists(physicalPath))
+            if (fileBytes == null)
             {
-                _logger.LogError("Aktif öğrenme görseli fiziksel yolda bulunamadı: {Path}", physicalPath);
+                _logger.LogError("Aktif öğrenme görseli depolama alanında bulunamadı: {Path}", item.ImagePath);
                 return true; // DB'de durumu güncellendiği için true dönüyoruz
             }
 
             using var formData = new MultipartFormDataContent();
-            var fileBytes = await File.ReadAllBytesAsync(physicalPath);
             var fileContent = new ByteArrayContent(fileBytes);
             fileContent.Headers.ContentType = new MediaTypeHeaderValue("image/jpeg");
 
-            formData.Add(fileContent, "file", Path.GetFileName(physicalPath));
+            formData.Add(fileContent, "file", Path.GetFileName(item.ImagePath));
             formData.Add(new StringContent(correctedDisease), "label");
 
             var addSampleEndpoint = _configuration["PythonApi:AddSampleEndpoint"] ?? "/active-learning/add-sample";
@@ -334,6 +319,45 @@ public class ActiveLearningService : IActiveLearningService
                 Status = "failed",
                 Message = $"Yeniden eğitim tetiklenemedi: {ex.Message}"
             };
+        }
+    }
+
+    /// <inheritdoc />
+    public async Task BackupModelToB2Async()
+    {
+        var provider = _configuration["FileStorage:Provider"];
+        if (provider != "Backblaze")
+        {
+            _logger.LogInformation("Depolama sağlayıcısı Backblaze olmadığından model bulut yedeklemesi atlandı.");
+            return;
+        }
+
+        _logger.LogInformation("Yeni eğitilen yapay zeka model dosyaları Backblaze B2 bulut sunucusuna yedekleniyor...");
+        var client = _httpClientFactory.CreateClient("PythonApiClient");
+        var filesToBackup = new[] { "efficientnet_b0_plant.pt", "efficientnet_b0_plant.quant.pt", "class_map.json" };
+        
+        foreach (var fileName in filesToBackup)
+        {
+            try
+            {
+                var downloadUrl = $"/active-learning/download-model/{fileName}";
+                var response = await client.GetAsync(downloadUrl);
+                if (response.IsSuccessStatusCode)
+                {
+                    var fileBytes = await response.Content.ReadAsByteArrayAsync();
+                    // Buluta "models/latest" alt klasörü altında kaydederiz
+                    await _fileStorageService.SaveFileBytesAsync(fileBytes, fileName, "models/latest");
+                    _logger.LogInformation("Model dosyası başarıyla Backblaze B2'ye yedeklendi: {File}", fileName);
+                }
+                else
+                {
+                    _logger.LogWarning("Model dosyası indirilemediği için yedeklenemedi: {File}. Durum: {Status}", fileName, response.StatusCode);
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Model dosyası B2'ye yedeklenirken hata oluştu: {File}", fileName);
+            }
         }
     }
 

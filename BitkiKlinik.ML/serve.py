@@ -419,6 +419,17 @@ async def retrain():
                 training_progress=1.0,
                 last_trained_at=state["last_trained_at"],
             )
+
+            # C# API Webhook bildirimi göndererek yeni model dosyalarının Backblaze B2'ye yedeklenmesini tetikle
+            try:
+                import requests
+                dotnet_port = os.environ.get("DOTNET_PORT", "5135")
+                webhook_url = f"http://localhost:{dotnet_port}/api/admin/active-learning/webhook/retrain-success"
+                requests.post(webhook_url, json={"status": "success"}, timeout=5)
+                logger.info("C# API model yedekleme webhook bildirimi başarıyla gönderildi.")
+            except Exception as web_ex:
+                logger.warning(f"C# API webhook bildirimi gönderilemedi: {web_ex}")
+
         except Exception as exc:
             logger.error("Yeniden eğitim hatası: %s", exc, exc_info=True)
             state.update(
@@ -432,6 +443,20 @@ async def retrain():
     asyncio.ensure_future(asyncio.to_thread(_blocking_train))
 
     return JSONResponse(content={"message": "Yeniden eğitim arka planda başlatıldı."})
+
+
+@app.get("/active-learning/download-model/{file_name}")
+def download_model(file_name: str):
+    """Eğitilen model dosyalarını C# API'nin bulut yedeklemesi için indirilebilir hale getirir."""
+    from fastapi.responses import FileResponse
+    if file_name not in ["efficientnet_b0_plant.pt", "efficientnet_b0_plant.quant.pt", "class_map.json"]:
+        raise HTTPException(status_code=400, detail="Geçersiz dosya adı.")
+    
+    file_path = OUTPUT_DIR / file_name
+    if not file_path.exists():
+        raise HTTPException(status_code=404, detail=f"Dosya bulunamadı: {file_name}")
+        
+    return FileResponse(path=file_path, filename=file_name)
 
 
 @app.get("/active-learning/retrain-status")
