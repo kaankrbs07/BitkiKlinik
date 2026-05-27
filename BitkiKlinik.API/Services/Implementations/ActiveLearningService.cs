@@ -323,6 +323,37 @@ public class ActiveLearningService : IActiveLearningService
     }
 
     /// <inheritdoc />
+    public async Task<RetrainStatusDTO?> GetRetrainStatusAsync()
+    {
+        try
+        {
+            var client = _httpClientFactory.CreateClient("PythonApiClient");
+            var endpoint = _configuration["PythonApi:RetrainStatusEndpoint"] ?? "/active-learning/retrain-status";
+            
+            var response = await client.GetAsync(endpoint);
+            if (response.IsSuccessStatusCode)
+            {
+                var content = await response.Content.ReadAsStringAsync();
+                var status = System.Text.Json.JsonSerializer.Deserialize<RetrainStatusDTO>(content, new System.Text.Json.JsonSerializerOptions
+                {
+                    PropertyNameCaseInsensitive = true
+                });
+                return status;
+            }
+            else
+            {
+                _logger.LogWarning("Python ML Servisinden retrain status alınamadı. Kod: {StatusCode}", response.StatusCode);
+                return null;
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "GetRetrainStatusAsync çalışırken hata oluştu.");
+            return null;
+        }
+    }
+
+    /// <inheritdoc />
     public async Task BackupModelToB2Async()
     {
         var provider = _configuration["FileStorage:Provider"];

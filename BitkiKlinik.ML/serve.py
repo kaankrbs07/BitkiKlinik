@@ -186,42 +186,45 @@ def predict_tta(image: Image.Image, tta_passes: int = 5) -> tuple[str, float]:
     """
     TTA uygulayarak daha stabil ve yüksek güvenli tahmin üretir.
     - Orijinal, Yatay Ters, Dikey Ters ve Hafif Döndürülmüş hallerini analiz eder.
+    - Tüm varyasyonları tek bir batch halinde modele göndererek (Batching) performansı artırır.
     - Softmax çıktılarını ortalar.
     """
     with model_lock:
-        all_probs = []
-        
-        def get_prob(img: Image.Image) -> torch.Tensor:
-            # Normalizasyon uygula ve tahmin et
-            tensor = preprocess(img).unsqueeze(0).to(state["device"])
-            logits = state["model"](tensor)
-            # Temperature Scaling (0.4)
-            return torch.softmax(logits / 0.4, dim=1)  # type: ignore
-        
-        # Pass 1: Orijinal
-        all_probs.append(get_prob(image))
+        imgs = [image]
         
         if tta_passes > 1:
             # Pass 2: Yatay Çevirme
-            flipped_h = F.hflip(image)  # type: ignore
-            all_probs.append(get_prob(flipped_h))
+            imgs.append(F.hflip(image))  # type: ignore
             
             # Pass 3: Dikey Çevirme
-            flipped_v = F.vflip(image)  # type: ignore
-            all_probs.append(torch.softmax(state["model"](preprocess(flipped_v).unsqueeze(0).to(state["device"])), dim=1))
+            imgs.append(F.vflip(image))  # type: ignore
             
             # Pass 4: Hafif Saat Yönünde Döndürme
-            rot_p = F.rotate(image, 5)  # type: ignore
-            all_probs.append(torch.softmax(state["model"](preprocess(rot_p).unsqueeze(0).to(state["device"])), dim=1))
+            imgs.append(F.rotate(image, 5))  # type: ignore
             
             # Pass 5: Hafif Saat Yönü Tersine Döndürme
-            rot_n = F.rotate(image, -5)  # type: ignore
-            all_probs.append(torch.softmax(state["model"](preprocess(rot_n).unsqueeze(0).to(state["device"])), dim=1))
+            imgs.append(F.rotate(image, -5))  # type: ignore
+            
+            # İstenen pass sayısına göre kırp
+            imgs = imgs[:tta_passes]
 
-        # Tüm pass'lerin ortalamasını al
-        avg_probs  = torch.stack(all_probs).mean(dim=0)
+        # Tüm görselleri preprocess et ve listele
+        tensors = [preprocess(img) for img in imgs]
+        
+        # Tek bir batch tensor'u halinde birleştir (Shape: [tta_passes, 3, 224, 224])
+        batch_tensor = torch.stack(tensors).to(state["device"])
+        
+        # Tek bir forward pass ile tüm varyasyonları tahmin et!
+        logits = state["model"](batch_tensor)
+        
+        # Temperature Scaling (0.4) ve Softmax uygula
+        probs = torch.softmax(logits / 0.4, dim=1)
+        
+        # Tüm pass'lerin olasılık ortalamalarını al (Shape: [1, num_classes])
+        avg_probs = probs.mean(dim=0)
+        
         confidence = float(avg_probs.max())
-        class_idx  = str(int(avg_probs.argmax()))
+        class_idx = str(int(avg_probs.argmax()))
 
         label = state["class_map"].get(class_idx, f"unknown_{class_idx}")
         return label, confidence
@@ -234,7 +237,12 @@ def predict_tta(image: Image.Image, tta_passes: int = 5) -> tuple[str, float]:
 async def lifespan(app: FastAPI):
     """FastAPI lifespan: startup → modeli yükle, shutdown → temizle."""
     logger.info("BitkiKlinik AI servisi başlatılıyor...")
-    load_model()
+    try:
+        load_model()
+    except Exception as e:
+        logger.error(f"Başlangıçta model yüklenirken hata oluştu (Model henüz eğitilmemiş olabilir): {e}")
+        # Uygulamanın çökmesini (Crash Loop) engellemek için hata yutulur. 
+        # /health veya /analyze endpoint'leri state['model'] is None kontrolüyle düzgün yanıt dönecektir.
     load_active_learning_meta()
     logger.info("Servis hazır. Endpoint: POST /analyze")
     yield

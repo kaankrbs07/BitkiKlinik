@@ -12,5 +12,6 @@ public interface IActiveLearningService
     Task<bool> IgnoreAsync(int queueId);
     Task<bool> FlagScanAsync(int scanId);
     Task<RetrainResponseDTO> TriggerRetrainAsync();
+    Task<RetrainStatusDTO?> GetRetrainStatusAsync();
     Task BackupModelToB2Async();
 }

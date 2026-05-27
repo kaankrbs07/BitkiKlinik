@@ -63,6 +63,18 @@ public class ActiveLearningController : ControllerBase
         return Ok(result);
     }
 
+    [HttpGet("retrain-status")]
+    public async Task<IActionResult> GetRetrainStatus()
+    {
+        var status = await _activeLearningService.GetRetrainStatusAsync();
+        if (status == null)
+        {
+            return StatusCode(503, new { message = "ML Servisinden eğitim durumu alınamadı." });
+        }
+        return Ok(status);
+    }
+
+
     [AllowAnonymous]
     [HttpPost("webhook/retrain-success")]
     public IActionResult RetrainSuccessWebhook()

@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { dotnetClient, fastApiClient } from '../api/client';
+import { dotnetClient } from '../api/client';
 import { useAuthStore } from '../store/useAuthStore';
 
 // ─── TypeScript Arayüzleri ───────────────────────────────────────────
@@ -85,11 +85,10 @@ export function useActiveLearning(): UseActiveLearningReturn {
     }
   }, []);
 
-  // 3. Python FastAPI'den Yeniden Eğitim Durumunu Çek
+  // 3. .NET API Üzerinden Yeniden Eğitim Durumunu Çek
   const fetchRetrainStatus = useCallback(async () => {
     try {
-      // Doğrudan fastApiClient üzerinden FastAPI servisini sorguluyoruz
-      const response = await fastApiClient.get('/active-learning/retrain-status');
+      const response = await dotnetClient.get(`${BASE_DOTNET}/retrain-status`);
       setRetrainStatus(response.data);
       return response.data as RetrainStatus;
     } catch (err: any) {

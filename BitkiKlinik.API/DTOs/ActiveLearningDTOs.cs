@@ -34,3 +34,15 @@ public class FlagScanDTO
 {
     public string? Reason { get; set; }
 }
+
+public class RetrainStatusDTO
+{
+    public string Status { get; set; } = string.Empty;
+    public double Progress { get; set; }
+    public string? Error { get; set; }
+    public string? LastTrainedAt { get; set; }
+    public int TotalSamples { get; set; }
+    public int CurrentSamples { get; set; }
+    public Dictionary<string, int> SamplesBreakdown { get; set; } = new();
+}
+

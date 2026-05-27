@@ -99,19 +99,61 @@ public class ScanOrchestrationService : IScanOrchestrationService
 
     // ── Özel Yardımcılar ──────────────────────────────────────────────────────
 
+    private static readonly Dictionary<string, string> PlantNameTranslations = new(StringComparer.OrdinalIgnoreCase)
+    {
+        { "Apple", "Elma" },
+        { "Cassava", "Manyok" },
+        { "Cherry", "Kiraz" },
+        { "Chili", "Biber" },
+        { "Coffee", "Kahve" },
+        { "Corn", "Mısır" },
+        { "Cucumber", "Salatalık" },
+        { "Gauva", "Guava" },
+        { "Guava", "Guava" },
+        { "Grape", "Üzüm" },
+        { "Jamun", "Jamun" },
+        { "Lemon", "Limon" },
+        { "Mango", "Mango" },
+        { "Peach", "Şeftali" },
+        { "Pepper_bell", "Dolmalık Biber" },
+        { "Pomegranate", "Nar" },
+        { "Potato", "Patates" },
+        { "Rice", "Pirinç" },
+        { "Soybean", "Soya" },
+        { "Strawberry", "Çilek" },
+        { "Sugarcane", "Şeker Kamışı" },
+        { "Tea", "Çay" },
+        { "Tomato", "Domates" },
+        { "Wheat", "Buğday" }
+    };
+
     /// <summary>
-    /// Model etiketinden bitki adını çıkarır.
-    /// "Tomato__Blight" → "Tomato",  "Potato___healthy" → "Potato"
+    /// Model etiketinden bitki adını çıkarır ve Türkçe karşılığını döner.
+    /// "Tomato__Blight" → "Domates",  "Potato___healthy" → "Patates"
     /// </summary>
     private static string ExtractPlantName(string modelLabel)
     {
+        string englishName = modelLabel;
         var separators = new[] { "___", "__" };
+        
         foreach (var sep in separators)
         {
             var idx = modelLabel.IndexOf(sep, StringComparison.Ordinal);
             if (idx > 0)
-                return modelLabel[..idx].Replace('_', ' ').Trim();
+            {
+                englishName = modelLabel[..idx];
+                break;
+            }
         }
-        return modelLabel.Replace('_', ' ').Trim();
+
+        // Türkçe karşılığını ara, yoksa temizlenmiş İngilizce ismi dön
+        if (PlantNameTranslations.TryGetValue(englishName, out var turkishName))
+        {
+            return turkishName;
+        }
+
+        return System.Globalization.CultureInfo.CurrentCulture.TextInfo.ToTitleCase(
+            englishName.Replace('_', ' ').Trim().ToLower()
+        );
     }
 }
