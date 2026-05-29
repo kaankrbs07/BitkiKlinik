@@ -17,6 +17,8 @@ Desktop.ini
 # ── 2. EDİTÖR VE IDE DOSYALARI (IDEs & Editors) ──
 .idea/
 .vscode/
+.vs/
+**/.vs/
 *.suo
 *.user
 *.userosscache
@@ -44,6 +46,7 @@ out/
 # ── 4. REACT NATIVE & EXPO MOBİL UYGULAMA (Frontend App) ──
 **/node_modules/
 **/.expo/
+**/coverage/
 **/dist/
 **/web-build/
 **/npm-debug.*
