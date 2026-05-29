@@ -1,0 +1,72 @@
+# Global Rules
+* text=auto eol=lf
+
+# React Native & Expo
+*.js text eol=lf
+*.jsx text eol=lf
+*.ts text eol=lf
+*.tsx text eol=lf
+*.json text eol=lf
+*.css text eol=lf
+*.html text eol=lf
+*.md text eol=lf
+*.yml text eol=lf
+*.yaml text eol=lf
+*.d.ts text eol=lf
+
+# .NET API Backend
+*.cs text eol=lf
+*.csproj text eol=lf
+*.sln text eol=lf
+*.config text eol=lf
+*.settings text eol=lf
+*.appsettings text eol=lf
+appsettings.json text eol=lf
+appsettings.Development.json text eol=lf
+
+# Python & ML
+*.py text eol=lf
+*.toml text eol=lf
+*.txt text eol=lf
+requirements.txt text eol=lf
+Dockerfile text eol=lf
+.dockerignore text eol=lf
+.gitignore text eol=lf
+
+# Scripts
+*.sh text eol=lf
+*.bat text eol=crlf
+*.cmd text eol=crlf
+
+# Binary Files
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.ico binary
+*.webp binary
+*.pdf binary
+*.zip binary
+
+# Fonts
+*.ttf binary
+*.otf binary
+*.woff binary
+*.woff2 binary
+
+# ML Model Weights
+*.pt binary
+*.pth binary
+*.onnx binary
+*.h5 binary
+*.pkl binary
+*.bin binary
+
+# Excludes
+node_modules/* -text
+venv/* -text
+.expo/* -text
+.vscode/* -text
+.idea/* -text
+bin/* binary
+obj/* binary
