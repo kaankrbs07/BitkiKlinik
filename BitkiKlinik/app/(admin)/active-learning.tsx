@@ -706,7 +706,7 @@ const s = StyleSheet.create({
     borderRadius: 16,
     padding: 12,
     marginBottom: 10,
-    alignItems: 'center',
+    alignItems: 'flex-start',
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.03,
@@ -728,7 +728,7 @@ const s = StyleSheet.create({
   itemDate: { fontSize: 10, color: C.slateLight },
   itemTitle: { fontSize: 14, fontWeight: 'bold', color: C.slate },
   itemSubtitle: { fontSize: 11, color: C.slateLight, marginTop: 1 },
-  actionRow: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingLeft: 6 },
+  actionRow: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingLeft: 6, alignSelf: 'flex-end' },
   actionResolveBtn: {
     width: 32,
     height: 32,

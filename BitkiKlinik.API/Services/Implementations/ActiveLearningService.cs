@@ -211,9 +211,21 @@ public class ActiveLearningService : IActiveLearningService
         var scan = await _context.PlantScans.FindAsync(scanId);
         if (scan == null) return false;
 
-        // Mükerrer bildirimleri engelle
-        var exists = await _context.ActiveLearningQueue.AnyAsync(q => q.ScanId == scanId && q.Source == ActiveLearningSource.UserFlagged);
-        if (exists) return true;
+        // Mükerrer bildirimleri engelle: Eğer bu tarama zaten kuyrukta bekliyorsa (Pending)
+        var existingPendingItem = await _context.ActiveLearningQueue
+            .FirstOrDefaultAsync(q => q.ScanId == scanId && q.Status == ActiveLearningStatus.Pending);
+
+        if (existingPendingItem != null)
+        {
+            // Zaten kuyruktaysa, kaynağını "UserFlagged" (kullanıcı bildirmesi) olarak güncelle
+            // (Çünkü kullanıcı bildirmesi daha yüksek öncelikli bir inceleme sebebidir)
+            if (existingPendingItem.Source != ActiveLearningSource.UserFlagged)
+            {
+                existingPendingItem.Source = ActiveLearningSource.UserFlagged;
+                await _context.SaveChangesAsync();
+            }
+            return true;
+        }
 
         await EnqueueAsync(
             scanId: scan.Id,

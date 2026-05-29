@@ -3,7 +3,7 @@ import { View, Text, StyleSheet, Image, ScrollView, TouchableOpacity, Dimensions
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
-import * as Notifications from 'expo-notifications';
+
 import { CONFIG } from '../constants/config';
 import { dotnetClient } from '../api/client';
 
@@ -54,39 +54,7 @@ export default function ResultScreen() {
     }
   };
 
-  const handleSetReminder = async () => {
-    try {
-      const permission = await Notifications.getPermissionsAsync();
-      let isGranted = permission.status === 'granted' || permission.granted;
-      
-      if (!isGranted) {
-        const request = await Notifications.requestPermissionsAsync();
-        isGranted = request.status === 'granted' || request.granted;
-      }
-      
-      if (!isGranted) {
-        Alert.alert('İzin Gerekli', 'Hatırlatıcı ekleyebilmek için bildirim izni vermeniz gerekmektedir.');
-        return;
-      }
 
-      await Notifications.scheduleNotificationAsync({
-        content: {
-          title: "🌿 Bitki Klinik Tedavi Hatırlatıcısı!",
-          body: `${data?.disease.name} için uyguladığınız tedavi adımlarını kontrol etme zamanı geldi. Lütfen bitkinizi inceleyin!`,
-          sound: true,
-        },
-        trigger: {
-          type: Notifications.SchedulableTriggerInputTypes.TIME_INTERVAL,
-          seconds: 3 * 24 * 60 * 60, // 3 gün sonra
-        } as any,
-      });
-
-      Alert.alert('Başarılı', 'Tedavi kontrol hatırlatıcınız 3 gün sonrasına kuruldu. Zamanı geldiğinde telefonunuzda bildirim olarak görünecektir!');
-    } catch (err) {
-      console.error(err);
-      Alert.alert('Hata', 'Hatırlatıcı planlanırken bir hata oluştu.');
-    }
-  };
 
   let data: DiseaseData | null = null;
   
@@ -158,15 +126,7 @@ export default function ResultScreen() {
             <Text style={styles.chatButtonText}>Yapay Zeka Hekime Danış</Text>
           </TouchableOpacity>
 
-          {!isHealthy && (
-            <TouchableOpacity 
-              style={styles.reminderButton} 
-              onPress={handleSetReminder}
-            >
-              <Ionicons name="alarm-outline" size={18} color="white" style={{marginRight: 6}} />
-              <Text style={styles.reminderButtonText}>Tedavi Kontrol Alarmı Kur (3 Gün Sonra)</Text>
-            </TouchableOpacity>
-          )}
+
 
           {data.scanId && (
             <TouchableOpacity 
@@ -510,24 +470,4 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     color: 'white',
   },
-  reminderButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginTop: 12,
-    paddingVertical: 12,
-    paddingHorizontal: 16,
-    borderRadius: 10,
-    backgroundColor: '#6366f1',
-    shadowColor: '#6366f1',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.15,
-    shadowRadius: 4,
-    elevation: 2,
-  },
-  reminderButtonText: {
-    fontSize: 14,
-    fontWeight: 'bold',
-    color: 'white',
-  }
 });
