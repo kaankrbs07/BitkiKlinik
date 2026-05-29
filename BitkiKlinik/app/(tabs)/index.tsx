@@ -26,6 +26,7 @@ import Animated, {
   FadeInRight, 
 } from 'react-native-reanimated';
 
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useAuthStore } from '../../store/useAuthStore';
 import { useDashboardData, RecentScan } from '../../hooks/useDashboardData';
 import { useProfile } from '../../hooks/useProfile';
@@ -570,6 +571,36 @@ async function registerForPushNotificationsAsync() {
   return null;
 }
 
+/**
+ * .NET API'den gelen son hastalık risk analizini kontrol edip, 
+ * eğer risk seviyesi yüksekse kullanıcıya yerel (local) bildirim fırlatır.
+ */
+async function checkAndShowLocalRiskNotification(alert: any) {
+  if (!alert || !alert.calculatedAt) return;
+  if (alert.riskLevel !== 'Kritik' && alert.riskLevel !== 'Orta') return;
+
+  try {
+    const lastNotifiedTime = await AsyncStorage.getItem('last_notified_risk_time');
+    
+    // Eğer bu risk daha önce bildirilmediyse yeni lokal bildirim oluştur
+    if (lastNotifiedTime !== alert.calculatedAt) {
+      await AsyncStorage.setItem('last_notified_risk_time', alert.calculatedAt);
+
+      await Notifications.scheduleNotificationAsync({
+        content: {
+          title: alert.riskLevel === 'Kritik' ? "🚨 Kritik Tarımsal Sağlık Tahmini!" : "⚠️ Orta Dereceli Hastalık Riski!",
+          body: `Bölgenizde ${alert.diseaseName} riski %${alert.riskPercentage} seviyesine ulaştı! Öneri: ${alert.suggestion}`,
+          sound: true,
+          priority: Notifications.AndroidNotificationPriority.HIGH,
+        },
+        trigger: null, // Anında göster
+      });
+    }
+  } catch (error) {
+    console.error('[checkAndShowLocalRiskNotification] Hata:', error);
+  }
+}
+
 // ============================================================================
 // MAIN HOMESCREEN COMPONENT
 // ============================================================================
@@ -682,15 +713,18 @@ export default function HomeScreen() {
 
       if (response.data?.latestRisk) {
         setRiskAlert(response.data.latestRisk);
+        checkAndShowLocalRiskNotification(response.data.latestRisk);
       } else {
         const riskResponse = await dotnetClient.get(API_ROUTES.LATEST_RISK_ALERT);
         setRiskAlert(riskResponse.data);
+        checkAndShowLocalRiskNotification(riskResponse.data);
       }
     } catch (err) {
       console.error("Konum ve tarımsal risk güncelleme hatası:", err);
       try {
         const response = await dotnetClient.get(API_ROUTES.LATEST_RISK_ALERT);
         setRiskAlert(response.data);
+        checkAndShowLocalRiskNotification(response.data);
       } catch {}
     } finally {
       setIsRiskLoading(false);
@@ -846,6 +880,8 @@ export default function HomeScreen() {
           <MainActionSection 
             onPress={() => router.push('/(tabs)/scan')}
           />
+
+
 
           {/* Tarımsal Sağlık & Hastalık Risk Tahmini Kartı */}
           <WeatherDiseaseRiskSection 

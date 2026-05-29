@@ -139,6 +139,7 @@ export default function ExploreScreen() {
   // --- Veri Çekme Fonksiyonları --- //
 
   const fetchEncyclopedia = async () => {
+    if (!useAuthStore.getState().isAuthenticated) return;
     try {
       const response = await dotnetClient.get('/Diseases');
       setDiseases(response.data || []);
@@ -148,6 +149,7 @@ export default function ExploreScreen() {
   };
 
   const fetchHistory = async (page = 1, append = false) => {
+    if (!useAuthStore.getState().isAuthenticated) return;
     try {
       const response = await dotnetClient.get(`/Dashboard/history?page=${page}&pageSize=${HISTORY_PAGE_SIZE}`);
       const newScans: ScanHistoryItem[] = response.data?.data || [];
@@ -160,13 +162,17 @@ export default function ExploreScreen() {
   };
 
   const loadMoreHistory = async () => {
-    if (historyLoadingMore || !historyHasMore) return;
+    if (historyLoadingMore || !historyHasMore || !useAuthStore.getState().isAuthenticated) return;
     setHistoryLoadingMore(true);
     await fetchHistory(historyPage + 1, true);
     setHistoryLoadingMore(false);
   };
 
   const loadData = useCallback(async (isSilent = false) => {
+    if (!isAuthenticated) {
+      setLoading(false);
+      return;
+    }
     if (!isSilent) setLoading(true);
     setHistoryPage(1);
     setHistoryHasMore(true);

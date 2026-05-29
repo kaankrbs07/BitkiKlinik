@@ -56,19 +56,15 @@ export default function RootLayout() {
           console.log('[RootLayout] JWT süresi dolmuş, sessiz yenileme deneniyor...');
           try {
             const { data } = await dotnetClient.post('/Auth/refresh', { refreshToken });
-            if (isMounted) {
-              login(data.token, data.refreshToken);
-              console.log('[RootLayout] Sessiz yenileme başarılı!');
-              return;
-            }
+            login(data.token, data.refreshToken);
+            console.log('[RootLayout] Sessiz yenileme başarılı!');
+            return;
           } catch (e) {
             console.warn('[RootLayout] Sessiz yenileme başarısız:', e);
           }
         }
         console.log('[RootLayout] Kalıcı oturum açılamadı, çıkış yapılıyor...');
-        if (isMounted) {
-          storeLogout();
-        }
+        storeLogout();
       }
     };
 

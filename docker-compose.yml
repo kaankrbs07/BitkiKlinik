@@ -148,6 +148,7 @@ services:
     volumes:
       - ./BitkiKlinik.API/wwwroot/uploads:/app/wwwroot/uploads
       - ./BitkiKlinik.API/keys:/root/.aspnet/DataProtection-Keys
+      - ./BitkiKlinik.API/bin/Debug/net9.0/Logs:/app/Logs
     networks:
       - bitkiklinik-net
     extra_hosts:

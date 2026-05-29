@@ -48,7 +48,7 @@ dotnetClient.interceptors.response.use(
     const originalRequest = error.config;
 
     // Refresh isteğinin kendisi 401 dönerse → doğrudan logout (sonsuz döngü önleme)
-    if (error.response?.status === 401 && originalRequest.url?.includes('/Auth/refresh')) {
+    if (error.response?.status === 401 && originalRequest.url?.toLowerCase().includes('/auth/refresh')) {
       useAuthStore.getState().logout();
       return Promise.reject(error);
     }
