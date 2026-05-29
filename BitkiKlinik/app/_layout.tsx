@@ -3,12 +3,20 @@ import { Stack, useRouter, useSegments } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import 'react-native-reanimated';
 import { useEffect } from 'react';
+import { LogBox } from 'react-native';
 import { jwtDecode } from 'jwt-decode';
 import { useShallow } from 'zustand/react/shallow';
 
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useAuthStore } from '../store/useAuthStore';
 import { NetworkBanner } from '../components/NetworkBanner';
+import { dotnetClient } from '../api/client';
+
+// Suppress expo-notifications warnings in Expo Go
+LogBox.ignoreLogs([
+  'expo-notifications: Android Push notifications',
+  '`expo-notifications` functionality is not fully supported in Expo Go',
+]);
 
 export const unstable_settings = {
   anchor: '(tabs)',
@@ -39,18 +47,38 @@ export default function RootLayout() {
   const router = useRouter();
 
   useEffect(() => {
-    // 1. Token süresi kontrolü — süresi geçmişse sessizce çıkış yap
-    if (isAuthenticated && token && isTokenExpired(token)) {
-      console.log('[RootLayout] JWT süresi dolmuş, çıkış yapılıyor...');
-      logout();
-      return; // logout store'u günceller → useEffect tekrar tetiklenir
-    }
+    let isMounted = true;
+
+    const checkAndRefreshSession = async () => {
+      if (isAuthenticated && token && isTokenExpired(token)) {
+        const { refreshToken, login, logout: storeLogout } = useAuthStore.getState();
+        if (refreshToken) {
+          console.log('[RootLayout] JWT süresi dolmuş, sessiz yenileme deneniyor...');
+          try {
+            const { data } = await dotnetClient.post('/Auth/refresh', { refreshToken });
+            if (isMounted) {
+              login(data.token, data.refreshToken);
+              console.log('[RootLayout] Sessiz yenileme başarılı!');
+              return;
+            }
+          } catch (e) {
+            console.warn('[RootLayout] Sessiz yenileme başarısız:', e);
+          }
+        }
+        console.log('[RootLayout] Kalıcı oturum açılamadı, çıkış yapılıyor...');
+        if (isMounted) {
+          storeLogout();
+        }
+      }
+    };
+
+    checkAndRefreshSession();
 
     // setTimeout ile bir sonraki event loop tick'ine ertele.
     // Bu, NavigationContainer'ın onReady callback'inin çalışmasını garanti eder.
-    // useRootNavigationState()?.key kontrolü yeterli değildir çünkü
-    // navigation state'in key'i, navigationRef.isReady() true olmadan önce oluşabilir.
     const timeout = setTimeout(() => {
+      if (!isMounted) return;
+      
       const inAuthGroup  = segments[0] === '(auth)';
       const isVerifyScreen = segments[1] === 'verify';
 
@@ -72,10 +100,11 @@ export default function RootLayout() {
       }
     }, 0);
 
-    return () => clearTimeout(timeout);
+    return () => {
+      isMounted = false;
+      clearTimeout(timeout);
+    };
   }, [isAuthenticated, isVerified, token, segments]);
-
-
   return (
     <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
       <NetworkBanner />

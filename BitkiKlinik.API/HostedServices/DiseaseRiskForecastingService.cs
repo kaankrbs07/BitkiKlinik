@@ -89,24 +89,33 @@ public class DiseaseRiskForecastingService : BackgroundService
         var alertsToSave = new List<DiseaseRiskAlert>();
         var pushNotificationsToEnqueue = new List<(string PushToken, float RiskPercentage, string Suggestion)>();
 
-        // 2. Dış hava durumu Open-Meteo API çağrılarını içeren döngüyü sıfır DB bağlantısı ile çalıştırıyoruz.
+        // 2. Co-locate/cluster users within ~10km grid cells to prevent API rate limiting
+        var userGroups = users
+            .GroupBy(u => (LatGrid: Math.Round(u.Latitude, 1), LonGrid: Math.Round(u.Longitude, 1)))
+            .ToList();
+
+        _logger.LogInformation("Kullanıcılar {Count} adet benzersiz coğrafi grid hücresine kümelendi.", userGroups.Count);
+
+        // 3. Dış hava durumu Open-Meteo API çağrılarını içeren döngüyü sıfır DB bağlantısı ile çalıştırıyoruz.
         await using (var scope = _services.CreateAsyncScope())
         {
             var weatherService = scope.ServiceProvider.GetRequiredService<IWeatherService>();
 
-            foreach (var user in users)
+            foreach (var group in userGroups)
             {
                 if (stoppingToken.IsCancellationRequested) break;
 
+                // Grubu temsil eden koordinat (grubun ilk kullanıcısının koordinatı)
+                var representative = group.First();
+
                 try
                 {
-                    _logger.LogInformation("Kullanıcı {UserId} ({Username}) için tahmin alınıyor. Konum: {Lat}, {Lon}",
-                        user.Id, user.Username, user.Latitude, user.Longitude);
+                    _logger.LogInformation("Coğrafi hücre ({LatGrid}, {LonGrid}) için hava tahmini çekiliyor...", group.Key.LatGrid, group.Key.LonGrid);
 
-                    var forecast = await weatherService.GetHourlyForecastAsync(user.Latitude, user.Longitude);
+                    var forecast = await weatherService.GetHourlyForecastAsync(representative.Latitude, representative.Longitude);
                     if (forecast == null)
                     {
-                        _logger.LogWarning("Kullanıcı {UserId} için hava tahmini çekilemedi.", user.Id);
+                        _logger.LogWarning("Grid hücresi ({LatGrid}, {LonGrid}) için hava tahmini çekilemedi.", group.Key.LatGrid, group.Key.LonGrid);
                         continue;
                     }
 
@@ -114,28 +123,34 @@ public class DiseaseRiskForecastingService : BackgroundService
 
                     _logger.LogInformation("Hesaplanan Risk: %{Risk} ({Level})", riskPercentage, riskLevel);
 
-                    // Son güncel riski geçici listeye ekle
-                    var alert = new DiseaseRiskAlert
+                    foreach (var user in group)
                     {
-                        UserId = user.Id,
-                        DiseaseName = "Mildiyö (Geç Yanıklık)",
-                        RiskPercentage = riskPercentage,
-                        RiskLevel = riskLevel,
-                        Suggestion = suggestion,
-                        CalculatedAt = DateTime.UtcNow
-                    };
+                        // Son güncel riski geçici listeye ekle
+                        var alert = new DiseaseRiskAlert
+                        {
+                            UserId = user.Id,
+                            DiseaseName = "Mildiyö (Geç Yanıklık)",
+                            RiskPercentage = riskPercentage,
+                            RiskLevel = riskLevel,
+                            Suggestion = suggestion,
+                            CalculatedAt = DateTime.UtcNow
+                        };
 
-                    alertsToSave.Add(alert);
+                        alertsToSave.Add(alert);
 
-                    // Eğer risk kritikse ve push token varsa, kuyruklanacak bildirimler listesine ekle
-                    if (riskPercentage >= 75.0f && !string.IsNullOrEmpty(user.ExpoPushToken))
-                    {
-                        pushNotificationsToEnqueue.Add((user.ExpoPushToken, riskPercentage, suggestion));
+                        // Eğer risk kritikse ve push token varsa, kuyruklanacak bildirimler listesine ekle
+                        if (riskPercentage >= 75.0f && !string.IsNullOrEmpty(user.ExpoPushToken))
+                        {
+                            pushNotificationsToEnqueue.Add((user.ExpoPushToken, riskPercentage, suggestion));
+                        }
                     }
+
+                    // Open-Meteo rate limitlerine saygı göstermek için istekler arasına kısa bir gecikme ekliyoruz
+                    await Task.Delay(TimeSpan.FromSeconds(1), stoppingToken);
                 }
                 catch (Exception ex)
                 {
-                    _logger.LogError(ex, "Kullanıcı {UserId} için tarımsal risk hesaplanırken hata oluştu.", user.Id);
+                    _logger.LogError(ex, "Grid hücresi ({LatGrid}, {LonGrid}) için tarımsal risk hesaplanırken hata oluştu.", group.Key.LatGrid, group.Key.LonGrid);
                 }
             }
         }

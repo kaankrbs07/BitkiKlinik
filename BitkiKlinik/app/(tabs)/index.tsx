@@ -14,11 +14,13 @@ import {
   Modal
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-
 import { useRouter } from 'expo-router';
 import { useFocusEffect } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 import * as Location from 'expo-location';
+import * as Notifications from 'expo-notifications';
+import * as Device from 'expo-device';
+import Constants from 'expo-constants';
 import Animated, { 
   FadeInDown, 
   FadeInRight, 
@@ -33,6 +35,16 @@ import { API_ROUTES } from '../../constants/api-routes';
 import { dotnetClient } from '../../api/client';
 
 const { width } = Dimensions.get('window');
+
+Notifications.setNotificationHandler({
+  handleNotification: async () => ({
+    shouldShowAlert: true,
+    shouldPlaySound: true,
+    shouldSetBadge: false,
+    shouldShowBanner: true,
+    shouldShowList: true,
+  }),
+});
 
 // ── Domain Interfaces ────────────────────────────────────────────────
 interface ChatSession {
@@ -531,6 +543,33 @@ function WeatherDiseaseRiskSection({ riskAlert, isLoading, locationGranted, onRe
   );
 }
 
+async function registerForPushNotificationsAsync() {
+  if (Platform.OS === 'android') {
+    await Notifications.setNotificationChannelAsync('default', {
+      name: 'default',
+      importance: Notifications.AndroidImportance.MAX,
+      vibrationPattern: [0, 250, 250, 250],
+      lightColor: '#FF231F7C',
+    });
+  }
+
+  if (Device.isDevice) {
+    const permission = (await Notifications.getPermissionsAsync()) as any;
+    let isGranted = permission.status === 'granted' || permission.granted;
+    if (!isGranted) {
+      const requestPermission = (await Notifications.requestPermissionsAsync()) as any;
+      isGranted = requestPermission.status === 'granted' || requestPermission.granted;
+    }
+    if (!isGranted) {
+      console.warn('Bildirim izni alınamadı!');
+      return null;
+    }
+  }
+
+  // Yerel bildirim izinleri başarıyla alındı ancak uzak sunucu push token alma işlemi bypass edildi.
+  return null;
+}
+
 // ============================================================================
 // MAIN HOMESCREEN COMPONENT
 // ============================================================================
@@ -623,11 +662,22 @@ export default function HomeScreen() {
 
       const { latitude, longitude } = location.coords;
 
+      // Bildirim token'ını al
+      let pushToken = "";
+      try {
+        const tokenResult = await registerForPushNotificationsAsync();
+        if (tokenResult) {
+          pushToken = tokenResult;
+        }
+      } catch (tokenErr) {
+        console.error("Push token alınırken hata:", tokenErr);
+      }
+
       // Konumu sunucuya güncelle
       const response = await dotnetClient.post(API_ROUTES.UPDATE_LOCATION, {
         latitude,
         longitude,
-        expoPushToken: ""
+        expoPushToken: pushToken
       });
 
       if (response.data?.latestRisk) {

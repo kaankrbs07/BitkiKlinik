@@ -145,6 +145,34 @@ def load_model() -> None:
             state["class_map"] = json.load(f)   # {"0": "Apple__black_rot", ...}
         logger.info("Sınıf haritası yüklendi: %d sınıf", len(state["class_map"]))
 
+        # Otomatik INT8 Quantization (Self-Healing)
+        # Eğer INT8 quantize modeli yoksa ama .pth ağırlıkları varsa otomatik olarak oluşturup kaydet
+        MODEL_PTH_PATH = OUTPUT_DIR / "efficientnet_b0_plant.pth"
+        if not MODEL_INT8_PATH.exists() and MODEL_PTH_PATH.exists():
+            try:
+                logger.info("INT8 model dosyası bulunamadı, .pth ağırlıklarından otomatik oluşturuluyor...")
+                checkpoint = torch.load(str(MODEL_PTH_PATH), map_location="cpu")
+                num_classes = checkpoint["num_classes"]
+                
+                import torchvision.models as models
+                import torch.nn as nn
+                
+                temp_model = models.efficientnet_b0(weights=None)
+                temp_model.classifier[1] = nn.Linear(1280, num_classes)
+                temp_model.load_state_dict(checkpoint["model_state_dict"])
+                temp_model.eval()
+                
+                quantized_model = torch.quantization.quantize_dynamic(
+                    temp_model,
+                    {nn.Linear},
+                    dtype=torch.qint8
+                )
+                scripted_quant = torch.jit.script(quantized_model)
+                scripted_quant.save(str(MODEL_INT8_PATH))
+                logger.info("INT8 quantized model başarıyla oluşturuldu ve kaydedildi: %s", MODEL_INT8_PATH)
+            except Exception as e:
+                logger.error("Başlangıçta INT8 modeli otomatik oluşturulurken hata: %s", e)
+
         # GPU + FP32
         if torch.cuda.is_available() and MODEL_FP32_PATH.exists():
             device = torch.device("cuda")

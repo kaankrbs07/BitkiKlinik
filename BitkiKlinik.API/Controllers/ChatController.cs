@@ -190,13 +190,17 @@ public class ChatController : ControllerBase
                 systemInstruction = sb.ToString();
             }
 
-            // 3. Veritabanından bu konuşmaya ait TÜM geçmişi (SessionId'ye göre) çekerek Gemini'ye ilet
+            // 3. Veritabanından bu konuşmaya ait son 10 mesajı (sliding window) çekerek Gemini'ye ilet
+            // Bu, veritabanı bellek yükünü ve Gemini API token tüketimini optimize eder.
             var dbHistory = await _context.ChatMessages
                 .Where(m => m.UserId == userId && m.SessionId == sessionId)
-                .OrderBy(m => m.CreatedDate)
+                .OrderByDescending(m => m.CreatedDate)
+                .Take(10)
                 .ToListAsync();
 
-            var geminiHistory = dbHistory.Select(m => new ChatMessageDTO
+            var sortedHistory = dbHistory.OrderBy(m => m.CreatedDate);
+
+            var geminiHistory = sortedHistory.Select(m => new ChatMessageDTO
             {
                 Role = m.Role,
                 Content = m.Content
