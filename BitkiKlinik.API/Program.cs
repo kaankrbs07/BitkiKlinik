@@ -25,6 +25,7 @@ builder.Logging.ClearProviders();
 builder.Host.UseNLog();
 
 // Add services to the container.
+builder.Services.AddMemoryCache();
 builder.Services.AddDbContext<ApplicationDbContext>(options =>
     options.UseSqlServer(builder.Configuration.GetConnectionString("DefaultConnection")));
 

@@ -12,6 +12,7 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Caching.Memory;
 
 namespace BitkiKlinik.API.Controllers;
 
@@ -26,6 +27,7 @@ public class ChatController : ControllerBase
     private readonly ITreatmentService _treatmentService;
     private readonly IGeminiService _geminiService;
     private readonly ILogger<ChatController> _logger;
+    private readonly Microsoft.Extensions.Caching.Memory.IMemoryCache _cache;
 
     public ChatController(
         ApplicationDbContext context,
@@ -33,7 +35,8 @@ public class ChatController : ControllerBase
         IDiseaseService diseaseService,
         ITreatmentService treatmentService,
         IGeminiService geminiService,
-        ILogger<ChatController> logger)
+        ILogger<ChatController> logger,
+        Microsoft.Extensions.Caching.Memory.IMemoryCache cache)
     {
         _context = context;
         _scanService = scanService;
@@ -41,6 +44,7 @@ public class ChatController : ControllerBase
         _treatmentService = treatmentService;
         _geminiService = geminiService;
         _logger = logger;
+        _cache = cache;
     }
 
     /// <summary>
@@ -108,12 +112,55 @@ public class ChatController : ControllerBase
                     return NotFound(new { Message = $"Belirtilen Tarama (ScanId: {request.ScanId.Value}) bulunamadı." });
                 }
 
-                // Hastalık detayını ve tedavilerini çek
-                var disease = (await _diseaseService.FindAsync(d => d.Name == scan.DiseaseName)).FirstOrDefault();
-                TreatmentsResultDTO? treatments = null;
-                if (disease != null)
+                // Hastalık detayını ve tedavilerini çek (Önbellekleme Eklendi - Performans Optimizasyonu)
+                var cacheKey = $"DiseaseRAG_{scan.DiseaseName}";
+                if (!_cache.TryGetValue(cacheKey, out string cachedRagData))
                 {
-                    treatments = await _treatmentService.GetTreatmentsByDiseaseIdAsync(disease.Id);
+                    var disease = (await _diseaseService.FindAsync(d => d.Name == scan.DiseaseName)).FirstOrDefault();
+                    TreatmentsResultDTO? treatments = null;
+                    if (disease != null)
+                    {
+                        treatments = await _treatmentService.GetTreatmentsByDiseaseIdAsync(disease.Id);
+                    }
+
+                    var ragBuilder = new StringBuilder();
+                    if (disease != null)
+                    {
+                        ragBuilder.AppendLine($"- Hastalık Açıklaması: {disease.Description}");
+                    }
+                    ragBuilder.AppendLine();
+
+                    if (treatments != null && (treatments.NaturalTreatments.Any() || treatments.ChemicalTreatments.Any()))
+                    {
+                        ragBuilder.AppendLine("--- SİSTEMDE KAYITLI ÖNERİLEN TEDAVİLER ---");
+                        
+                        if (treatments.NaturalTreatments.Any())
+                        {
+                            ragBuilder.AppendLine("[DOĞAL TEDAVİLER]");
+                            foreach (var t in treatments.NaturalTreatments)
+                            {
+                                ragBuilder.AppendLine($"- **{t.Title}**: {t.Instructions}");
+                            }
+                            ragBuilder.AppendLine();
+                        }
+
+                        if (treatments.ChemicalTreatments.Any())
+                        {
+                            ragBuilder.AppendLine("[KİMYASAL TEDAVİLER]");
+                            foreach (var t in treatments.ChemicalTreatments)
+                            {
+                                ragBuilder.AppendLine($"- **{t.Title}**: {t.Instructions}");
+                            }
+                            ragBuilder.AppendLine();
+                        }
+                    }
+                    else
+                    {
+                        ragBuilder.AppendLine("Not: Bu hastalık/durum için veritabanımızda kayıtlı özel bir kimyasal/doğal tedavi bulunmamaktadır (Sağlıklı bitkiler için de tedavi sunulmaz).");
+                    }
+
+                    cachedRagData = ragBuilder.ToString();
+                    _cache.Set(cacheKey, cachedRagData, TimeSpan.FromHours(24)); // 24 saat boyunca SQL'e gitmeden bellekten oku
                 }
 
                 // RAG sistem talimatını hazırla
@@ -125,44 +172,8 @@ public class ChatController : ControllerBase
                 sb.AppendLine($"- Bitki Türü: {scan.PlantName}");
                 sb.AppendLine($"- Teşhis Edilen Durum/Hastalık: {scan.DiseaseName}");
                 sb.AppendLine($"- AI Teşhis Güven Oranı: %{Math.Round(scan.Confidence * 100)}");
-                
-                if (disease != null)
-                {
-                    sb.AppendLine($"- Hastalık Açıklaması: {disease.Description}");
-                }
-                
-                sb.AppendLine();
+                sb.AppendLine(cachedRagData);
 
-                if (treatments != null && (treatments.NaturalTreatments.Any() || treatments.ChemicalTreatments.Any()))
-                {
-                    sb.AppendLine("--- SİSTEMDE KAYITLI ÖNERİLEN TEDAVİLER ---");
-                    
-                    if (treatments.NaturalTreatments.Any())
-                    {
-                        sb.AppendLine("[DOĞAL TEDAVİLER]");
-                        foreach (var t in treatments.NaturalTreatments)
-                        {
-                            sb.AppendLine($"- **{t.Title}**: {t.Instructions}");
-                        }
-                        sb.AppendLine();
-                    }
-
-                    if (treatments.ChemicalTreatments.Any())
-                    {
-                        sb.AppendLine("[KİMYASAL TEDAVİLER]");
-                        foreach (var t in treatments.ChemicalTreatments)
-                        {
-                            sb.AppendLine($"- **{t.Title}**: {t.Instructions}");
-                        }
-                        sb.AppendLine();
-                    }
-                }
-                else
-                {
-                    sb.AppendLine("Not: Bu hastalık/durum için veritabanımızda kayıtlı özel bir kimyasal/doğal tedavi bulunmamaktadır (Sağlıklı bitkiler için de tedavi sunulmaz).");
-                }
-
-                sb.AppendLine();
                 sb.AppendLine("--- SİZİN İÇİN KURALLAR VE TALİMATLAR ---");
                 sb.AppendLine("1. Her zaman kibar, profesyonel, yapıcı ve cesaretlendirici bir ziraat mühendisi gibi konuş.");
                 sb.AppendLine("2. Soruları yanıtlarken yukarıda belirtilen bitki, hastalık ve tedavileri BAZ AL. Öncelikle yukarıdaki DOĞAL ve KİMYASAL tedavilerin nasıl uygulanacağını, püf noktalarını açıkla.");
@@ -200,10 +211,11 @@ public class ChatController : ControllerBase
 
             var sortedHistory = dbHistory.OrderBy(m => m.CreatedDate);
 
+            // Token Optimizasyonu: Geçmiş mesajları belirli bir karakterle sınırla (Ağır metin yükü koruması)
             var geminiHistory = sortedHistory.Select(m => new ChatMessageDTO
             {
                 Role = m.Role,
-                Content = m.Content
+                Content = m.Content.Length > 1000 ? m.Content.Substring(0, 1000) + "... [Metin kırpıldı]" : m.Content
             }).ToList();
 
             // 4. Gemini API ile konuş
@@ -242,48 +254,34 @@ public class ChatController : ControllerBase
         {
             var userId = GetCurrentUserId();
 
-            // Sorgu 1: Her oturum için yalnızca max tarih ve SessionId çek (hafif — navigation property yok)
-            var sessionMeta = await _context.ChatMessages
+            // ── EF Core 6+ GroupBy Optimizasyonu ──
+            // Bu sorgu veritabanına tek bir "ROW_NUMBER() OVER(PARTITION BY SessionId ORDER BY CreatedDate DESC)"
+            // olarak çevrilir. N+1 ve korelasyonlu alt sorgu (correlated subquery) problemlerini çözer.
+            var lastMessages = await _context.ChatMessages
+                .AsNoTracking()
                 .Where(m => m.UserId == userId)
+                .Include(m => m.Scan)
                 .GroupBy(m => m.SessionId)
-                .Select(g => new { SessionId = g.Key, MaxDate = g.Max(m => m.CreatedDate) })
-                .OrderByDescending(s => s.MaxDate)
+                .Select(g => g.OrderByDescending(m => m.CreatedDate).FirstOrDefault())
                 .ToListAsync();
 
-            if (!sessionMeta.Any())
+            if (!lastMessages.Any() || lastMessages.All(m => m == null))
                 return Ok(Enumerable.Empty<object>());
 
-            // Sorgu 2: Her oturum için korelasyonlu alt sorgu — yalnızca son mesajları döndürür
-            // SQL: WHERE CreatedDate = MAX(CreatedDate) FOR that SessionId
-            var lastMessages = await _context.ChatMessages
-                .Where(m => m.UserId == userId &&
-                            m.CreatedDate == _context.ChatMessages
-                                .Where(m2 => m2.SessionId == m.SessionId && m2.UserId == userId)
-                                .Max(m2 => m2.CreatedDate))
-                .Include(m => m.Scan)
-                .AsNoTracking()
-                .ToListAsync();
-
-            // sessionMeta sırasına göre oturumları oluştur (Milisaniye çakışmalarını önlemek için gruplayarak tekilleştiriyoruz)
-            var lastMsgBySession = lastMessages
-                .GroupBy(m => m.SessionId)
-                .ToDictionary(g => g.Key, g => g.First());
-
-            var sessions = sessionMeta
-                .Where(s => lastMsgBySession.ContainsKey(s.SessionId))
-                .Select(s =>
+            var sessions = lastMessages
+                .Where(m => m != null)
+                .OrderByDescending(m => m!.CreatedDate)
+                .Select(m =>
                 {
-                    var lastMsg = lastMsgBySession[s.SessionId];
-                    var scan = lastMsg.Scan;
-
+                    var scan = m!.Scan;
                     return new
                     {
-                        SessionId = s.SessionId,
-                        ScanId = lastMsg.ScanId,
+                        SessionId = m.SessionId,
+                        ScanId = m.ScanId,
                         PlantName = scan != null ? scan.PlantName : "Genel Danışmanlık",
                         DiseaseName = scan != null ? scan.DiseaseName : "Genel Bitki Soruları",
-                        LastMessage = lastMsg.Content.Length > 80 ? lastMsg.Content.Substring(0, 80) + "..." : lastMsg.Content,
-                        LastMessageDate = DateTime.SpecifyKind(s.MaxDate, DateTimeKind.Utc),
+                        LastMessage = m.Content.Length > 80 ? m.Content.Substring(0, 80) + "..." : m.Content,
+                        LastMessageDate = DateTime.SpecifyKind(m.CreatedDate, DateTimeKind.Utc),
                         IsHealthy = scan == null || scan.Status == Models.Enums.ScanStatus.Healthy,
                         ImageUrl = scan != null ? scan.ImageUrl : null
                     };
