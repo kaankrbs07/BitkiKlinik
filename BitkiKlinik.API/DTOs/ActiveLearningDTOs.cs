@@ -46,3 +46,22 @@ public class RetrainStatusDTO
     public Dictionary<string, int> SamplesBreakdown { get; set; } = new();
 }
 
+public class RetrainHistoryDTO
+{
+    public DateTime TrainedAt { get; set; }
+    public int Epochs { get; set; }
+    public double TrainLoss { get; set; }
+    public double TrainAcc { get; set; }
+    public double ValLoss { get; set; }
+    public double ValAcc { get; set; }
+    public int TotalSamples { get; set; }
+    public int AlSamples { get; set; }
+    public int BufferSamples { get; set; }
+}
+
+public class ActiveLearningClassDistributionDTO
+{
+    public string ClassLabel { get; set; } = string.Empty;
+    public int Count { get; set; }
+}
+

@@ -76,6 +76,15 @@ const adminMenuItems = [
     bgColor: '#fff0e6',
     route: '/(admin)/rabbitmq',
   },
+  {
+    id: 'mlops',
+    title: 'MLOps & Model Performansı',
+    subtitle: 'Eğitim doğruluk grafiklerini ve veri dağılımını izle',
+    icon: 'bar-chart' as any, // 'bar-chart' or 'analytics'
+    color: '#3b82f6',
+    bgColor: '#eff6ff',
+    route: '/(admin)/mlops',
+  },
 ];
 
 export default function AdminDashboardScreen() {

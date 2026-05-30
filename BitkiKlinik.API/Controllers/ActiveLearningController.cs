@@ -74,6 +74,24 @@ public class ActiveLearningController : ControllerBase
         return Ok(status);
     }
 
+    [HttpGet("retrain-history")]
+    public async Task<IActionResult> GetRetrainHistory()
+    {
+        var history = await _activeLearningService.GetRetrainHistoryAsync();
+        if (history == null)
+        {
+            return StatusCode(503, new { message = "ML Servisinden eğitim geçmişi alınamadı." });
+        }
+        return Ok(history);
+    }
+
+    [HttpGet("class-distribution")]
+    public async Task<IActionResult> GetClassDistribution()
+    {
+        var distribution = await _activeLearningService.GetClassDistributionAsync();
+        return Ok(distribution);
+    }
+
 
     [AllowAnonymous]
     [HttpPost("webhook/retrain-success")]

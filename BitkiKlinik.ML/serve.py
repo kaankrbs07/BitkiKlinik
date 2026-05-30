@@ -558,3 +558,18 @@ def retrain_status():
         "currentSamples"  : current_samples,
         "samplesBreakdown": samples_breakdown
     })
+
+
+@app.get("/active-learning/retrain-history")
+def retrain_history():
+    """Eğitilen modelin geçmiş doğruluk ve kayıp değerlerinin listesini döner."""
+    history_file = OUTPUT_DIR / "retrain_history.json"
+    if history_file.exists():
+        try:
+            with history_file.open("r", encoding="utf-8") as f:
+                history_data = json.load(f)
+                return JSONResponse(content=history_data)
+        except Exception as e:
+            logger.error(f"Eğitim geçmişi dosyası okunurken hata: {e}")
+            raise HTTPException(status_code=500, detail=f"Eğitim geçmişi okunamadı: {e}")
+    return JSONResponse(content=[])

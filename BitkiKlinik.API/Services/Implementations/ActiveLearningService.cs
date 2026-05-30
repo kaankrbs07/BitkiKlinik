@@ -366,6 +366,53 @@ public class ActiveLearningService : IActiveLearningService
     }
 
     /// <inheritdoc />
+    public async Task<List<RetrainHistoryDTO>?> GetRetrainHistoryAsync()
+    {
+        try
+        {
+            var client = _httpClientFactory.CreateClient("PythonApiClient");
+            var endpoint = "/active-learning/retrain-history"; // FastAPI history endpoint
+            
+            var response = await client.GetAsync(endpoint);
+            if (response.IsSuccessStatusCode)
+            {
+                var content = await response.Content.ReadAsStringAsync();
+                var history = System.Text.Json.JsonSerializer.Deserialize<List<RetrainHistoryDTO>>(content, new System.Text.Json.JsonSerializerOptions
+                {
+                    PropertyNameCaseInsensitive = true
+                });
+                return history;
+            }
+            else
+            {
+                _logger.LogWarning("Python ML Servisinden retrain history alınamadı. Kod: {StatusCode}", response.StatusCode);
+                return null;
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "GetRetrainHistoryAsync çalışırken hata oluştu.");
+            return null;
+        }
+    }
+
+    /// <inheritdoc />
+    public async Task<List<ActiveLearningClassDistributionDTO>> GetClassDistributionAsync()
+    {
+        var distribution = await _context.ActiveLearningQueue
+            .Where(q => q.Status == ActiveLearningStatus.Resolved)
+            .GroupBy(q => q.CorrectedDisease)
+            .Select(g => new ActiveLearningClassDistributionDTO
+            {
+                ClassLabel = g.Key ?? string.Empty,
+                Count = g.Count()
+            })
+            .ToListAsync();
+
+        return distribution;
+    }
+
+    /// <inheritdoc />
     public async Task BackupModelToB2Async()
     {
         var provider = _configuration["FileStorage:Provider"];

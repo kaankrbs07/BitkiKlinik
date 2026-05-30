@@ -314,4 +314,34 @@ def retrain_model(progress_callback=None):
         print(f"Uyarı: Quantized model güncellenemedi: {e}")
 
     total_samples = len(al_samples) + len(buffer_samples)
+
+    # ── 12. Tarihsel Eğitim Metriklerini Kaydet ──────────────────────────────
+    try:
+        import datetime
+        history_path = os.path.join("outputs", "retrain_history.json")
+        history_data = []
+        if os.path.exists(history_path):
+            with open(history_path, "r", encoding="utf-8") as hf:
+                history_data = json.load(hf)
+        
+        # Yeni eğitim kaydı
+        new_entry = {
+            "trainedAt": datetime.datetime.now(datetime.timezone.utc).isoformat(),
+            "epochs": epochs,
+            "trainLoss": round(train_loss, 4),
+            "trainAcc": round(train_acc, 4),
+            "valLoss": round(valid_loss, 4),
+            "valAcc": round(valid_acc, 4),
+            "totalSamples": total_samples,
+            "alSamples": len(al_samples),
+            "bufferSamples": len(buffer_samples)
+        }
+        history_data.append(new_entry)
+        
+        with open(history_path, "w", encoding="utf-8") as hf:
+            json.dump(history_data, hf, ensure_ascii=False, indent=2)
+        print(f"Tarihsel eğitim metrikleri kaydedildi: {history_path}")
+    except Exception as hex:
+        print(f"Uyarı: Tarihsel metrikler kaydedilemedi: {hex}")
+
     return total_samples
