@@ -16,6 +16,7 @@ using System.Text;
 using NLog;
 using NLog.Web;
 using BitkiKlinik.API.Middlewares;
+using Microsoft.AspNetCore.HttpOverrides;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -160,6 +161,16 @@ builder.Services.AddOpenApi();
 builder.Services.AddHostedService<ActiveLearningBackfillService>();
 builder.Services.AddHostedService<DiseaseRiskForecastingService>();
 
+// ── Reverse Proxy / Load Balancer Desteği ──────────────────────────────────
+// Rate Limiter'ın Docker, Cloudflare veya Nginx arkasındaki gerçek kullanıcı IP'lerini
+// (X-Forwarded-For) doğru okuması için Forwarded Headers etkinleştirilir.
+builder.Services.Configure<ForwardedHeadersOptions>(options =>
+{
+    options.ForwardedHeaders = ForwardedHeaders.XForwardedFor | ForwardedHeaders.XForwardedProto;
+    // IP maskeleme sorunlarını önlemek için proxy ağlarına güven:
+    options.KnownNetworks.Clear();
+    options.KnownProxies.Clear();
+});
 
 var app = builder.Build();
 
@@ -220,6 +231,7 @@ if (!app.Environment.IsDevelopment())
 }
 app.UseStaticFiles(); // wwwroot/uploads/scans altındaki görselleri serve eder
 
+app.UseForwardedHeaders(); // RateLimiter'dan önce çağrılmalıdır!
 app.UseRateLimiter();
 app.UseCors("AllowAllOrigins");
 
