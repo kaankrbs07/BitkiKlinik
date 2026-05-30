@@ -175,11 +175,11 @@ public class ChatController : ControllerBase
                 sb.AppendLine(cachedRagData);
 
                 sb.AppendLine("--- SİZİN İÇİN KURALLAR VE TALİMATLAR ---");
-                sb.AppendLine("1. Her zaman kibar, profesyonel, yapıcı ve cesaretlendirici bir ziraat mühendisi gibi konuş.");
-                sb.AppendLine("2. Soruları yanıtlarken yukarıda belirtilen bitki, hastalık ve tedavileri BAZ AL. Öncelikle yukarıdaki DOĞAL ve KİMYASAL tedavilerin nasıl uygulanacağını, püf noktalarını açıkla.");
-                sb.AppendLine("3. Uygulamamızın tedavilerini ön plana çıkar, uydurma veya sistemimizde olmayan alakasız kimyasal ilaç isimlerini tavsiye etmekten kaçın.");
-                sb.AppendLine("4. Çiftçilere pratik, günlük hayatta uygulanabilir tavsiyeler ver. Sulama saatleri, bitki temizliği, güneş ışığı gibi kültürel önlemleri mutlaka hatırlat.");
-                sb.AppendLine("5. Yanıtlarını markdown formatında, kalın başlıklar, listeler ve maddeler kullanarak şık ve okunabilir bir şekilde yapılandır.");
+                sb.AppendLine("1. Her zaman kibar, profesyonel ve son derece öz/net konuş. Yanıtlarını olabildiğince kısa, doğrudan ve sade tut. Asla gereksiz detaylara veya uzun açıklamalara girme.");
+                sb.AppendLine("2. Soruları yanıtlarken yukarıda belirtilen bitki, hastalık ve tedavileri BAZ AL. Öncelikle yukarıdaki DOĞAL ve KİMYASAL tedavilerin nasıl uygulanacağını açıkla.");
+                sb.AppendLine("3. Kesinlikle genel bitki bakım ipuçları, sulama, güneş ışığı veya kültürel bakım tavsiyeleri (bakım ipuçları) VERME.");
+                sb.AppendLine("4. Uygulamamızın tedavilerini ön plana çıkar, uydurma veya sistemimizde olmayan alakasız kimyasal ilaç isimlerini tavsiye etmekten kaçın.");
+                sb.AppendLine("5. Yanıtlarını markdown formatında, kısa listeler ve maddeler kullanarak son derece şık ve öz bir şekilde yapılandır.");
                 sb.AppendLine("6. Kesinlikle Türkçe konuş.");
 
                 systemInstruction = sb.ToString();
@@ -192,10 +192,10 @@ public class ChatController : ControllerBase
                 sb.AppendLine("Kullanıcı seninle genel bitki bakımı, hastalıklar, sulama ve tarım hakkında konuşuyor.");
                 sb.AppendLine();
                 sb.AppendLine("--- SİZİN İÇİN KURALLAR VE TALİMATLAR ---");
-                sb.AppendLine("1. Her zaman kibar, profesyonel, yapıcı ve cesaretlendirici bir ziraat mühendisi gibi konuş.");
-                sb.AppendLine("2. Bitki bakımı, sulama, toprak seçimi, saksı değiştirme, gübreleme ve genel hastalıklar hakkındaki soruları bilimsel, pratik ve anlaşılır bir dille yanıtla.");
-                sb.AppendLine("3. Kullanıcıya eğer bitkisinde veya yapraklarında bir leke/hastalık şüphesi varsa, uygulamamızın 'AI Sağlık Taraması' (Kamera taraması) özelliğini kullanarak fotoğraf yükleyip anında kesin teşhis koyabileceğini hatırlat.");
-                sb.AppendLine("4. Yanıtlarını markdown formatında, kalın başlıklar, listeler ve maddeler kullanarak şık ve okunabilir bir şekilde yapılandır.");
+                sb.AppendLine("1. Her zaman kibar, profesyonel ve son derece öz/net konuş. Yanıtlarını olabildiğince kısa, doğrudan ve sade tut. Asla gereksiz detaylara veya uzun açıklamalara girme.");
+                sb.AppendLine("2. Kesinlikle genel bitki bakım ipuçları, sulama veya kültürel bakım tavsiyeleri (bakım ipuçları) VERME.");
+                sb.AppendLine("3. Soruları son derece kısa ve öz bir dille yanıtla. Kullanıcıya eğer bitkisinde veya yapraklarında leke/hastalık şüphesi varsa, uygulamamızın 'AI Sağlık Taraması' (Kamera taraması) özelliğini kullanarak fotoğraf yükleyip kesin teşhis koyabileceğini hatırlat.");
+                sb.AppendLine("4. Yanıtlarını markdown formatında, kısa listeler ve maddeler kullanarak son derece şık ve öz bir şekilde yapılandır.");
                 sb.AppendLine("5. Kesinlikle Türkçe konuş.");
 
                 systemInstruction = sb.ToString();
