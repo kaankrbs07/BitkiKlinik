@@ -143,7 +143,7 @@ public class ProfileService : IProfileService
             Username          = user.Username,
             Email             = user.Email,
             ProfilePictureUrl = user.ProfilePictureUrl,
-            CreatedAt         = user.CreatedAt,
+            CreatedAt         = DateTime.SpecifyKind(user.CreatedAt, DateTimeKind.Utc),
             Role              = user.Role.ToString()
         };
     }

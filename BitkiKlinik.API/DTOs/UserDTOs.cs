@@ -57,3 +57,26 @@ public class RefreshTokenRequestDTO
     [Required(ErrorMessage = "Refresh token zorunludur.")]
     public string RefreshToken { get; set; } = string.Empty;
 }
+
+public class ForgotPasswordDTO
+{
+    [Required(ErrorMessage = "E-posta adresi zorunludur.")]
+    [EmailAddress(ErrorMessage = "Geçerli bir e-posta adresi giriniz.")]
+    public string Email { get; set; } = string.Empty;
+}
+
+public class ResetPasswordDTO
+{
+    [Required(ErrorMessage = "E-posta adresi zorunludur.")]
+    [EmailAddress(ErrorMessage = "Geçerli bir e-posta adresi giriniz.")]
+    public string Email { get; set; } = string.Empty;
+
+    [Required(ErrorMessage = "Doğrulama kodu zorunludur.")]
+    [StringLength(6, MinimumLength = 6, ErrorMessage = "Doğrulama kodu 6 haneli olmalıdır.")]
+    [RegularExpression(@"^\d{6}$", ErrorMessage = "Doğrulama kodu yalnızca rakam içermelidir.")]
+    public string Code { get; set; } = string.Empty;
+
+    [Required(ErrorMessage = "Yeni şifre zorunludur.")]
+    [StringLength(128, MinimumLength = 8, ErrorMessage = "Yeni şifre en az 8 karakter olmalıdır.")]
+    public string NewPassword { get; set; } = string.Empty;
+}

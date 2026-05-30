@@ -221,6 +221,68 @@ public class AuthController : ControllerBase
         return Ok(new { Message = "Yeni doğrulama kodu e-posta adresinize gönderildi." });
     }
 
+    // ── POST /api/auth/forgot-password ────────────────────────────────────
+    [HttpPost("forgot-password")]
+    [EnableRateLimiting("AuthPolicy")]
+    public async Task<IActionResult> ForgotPassword([FromBody] ForgotPasswordDTO dto)
+    {
+        var user = await _userService.GetByEmailAsync(dto.Email);
+        
+        if (user == null)
+        {
+            // Güvenlik amacıyla e-posta bulunamazsa bile "gönderildi" mesajı döneriz (user enumeration önleme)
+            return Ok(new { Message = "Şifre sıfırlama kodu e-posta adresinize gönderildi (Eğer kayıtlıysa)." });
+        }
+
+        var resetCode = GenerateOtp();
+        user.VerificationCode = resetCode;
+        user.VerificationCodeExpiryTime = DateTime.UtcNow.AddMinutes(15);
+        
+        await _userService.UpdateAsync(user);
+
+        var subject = "Bitki Klinik - Şifre Sıfırlama Kodu";
+        var message = $"Merhaba {user.Username},<br><br>Şifrenizi yenilemek için doğrulama kodunuz: <b>{resetCode}</b><br><br>Bu kod 15 dakika boyunca geçerlidir.";
+        
+        // Hangfire ile arka planda e-posta gönderimi
+        _emailService.SendEmailInBackground(user.Email, subject, message);
+
+        _logger.LogInformation("Şifre sıfırlama kodu gönderildi. UserId: {UserId}", user.Id);
+
+        return Ok(new { Message = "Şifre sıfırlama kodu e-posta adresinize gönderildi." });
+    }
+
+    // ── POST /api/auth/reset-password ─────────────────────────────────────
+    [HttpPost("reset-password")]
+    [EnableRateLimiting("AuthPolicy")]
+    public async Task<IActionResult> ResetPassword([FromBody] ResetPasswordDTO dto)
+    {
+        var user = await _userService.GetByEmailAsync(dto.Email);
+        
+        if (user == null)
+            return NotFound(new { Message = "Kullanıcı bulunamadı." });
+
+        if (user.VerificationCode != dto.Code)
+            return BadRequest(new { Message = "Geçersiz şifre sıfırlama kodu." });
+
+        if (user.VerificationCodeExpiryTime < DateTime.UtcNow)
+            return BadRequest(new { Message = "Sıfırlama kodunun süresi dolmuş. Lütfen yeni bir kod isteyin." });
+
+        // Şifreyi hashleyerek güncelle
+        user.Password = _passwordHasher.Hash(dto.NewPassword);
+        user.VerificationCode = null;
+        user.VerificationCodeExpiryTime = null;
+
+        // Opsiyonel: Aktif oturumları düşürmek için refresh token'ı sıfırla
+        user.RefreshToken = null;
+        user.RefreshTokenExpiry = null;
+
+        await _userService.UpdateAsync(user);
+
+        _logger.LogInformation("Şifre başarıyla yenilendi. UserId: {UserId}", user.Id);
+
+        return Ok(new { Message = "Şifreniz başarıyla yenilendi. Yeni şifrenizle giriş yapabilirsiniz." });
+    }
+
     // ── Private Helpers ────────────────────────────────────────────────────
 
     /// <summary>

@@ -91,7 +91,7 @@ public class ActiveLearningService : IActiveLearningService
                 PredictedDisease = q.PredictedDisease,
                 Confidence = q.Confidence,
                 Source = q.Source.ToString(),
-                CreatedAt = q.CreatedAt
+                CreatedAt = DateTime.SpecifyKind(q.CreatedAt, DateTimeKind.Utc)
             })
             .ToListAsync();
     }

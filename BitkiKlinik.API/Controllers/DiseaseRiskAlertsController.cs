@@ -60,6 +60,7 @@ public class DiseaseRiskAlertsController : ControllerBase
                 });
             }
 
+            latestAlert.CalculatedAt = DateTime.SpecifyKind(latestAlert.CalculatedAt, DateTimeKind.Utc);
             return Ok(latestAlert);
         }
         catch (Exception ex)
@@ -99,6 +100,29 @@ public class DiseaseRiskAlertsController : ControllerBase
 
             _logger.LogInformation("Kullanıcı {UserId} konumu güncellendi. Lat: {Lat}, Lon: {Lon}", 
                 userId, request.Latitude, request.Longitude);
+
+            // ─── 15 Dakikalık Önbellek Kontrolü (Throttling) ───
+            var latestAlert = await _context.DiseaseRiskAlerts
+                .Where(a => a.UserId == userId)
+                .OrderByDescending(a => a.CalculatedAt)
+                .FirstOrDefaultAsync();
+
+            if (latestAlert != null && DateTime.UtcNow - latestAlert.CalculatedAt < TimeSpan.FromMinutes(15))
+            {
+                _logger.LogInformation("Kullanıcı {UserId} için son 15 dakika içinde risk analizi yapılmış. Hava durumu servisi çağrılmadı, önbellek kullanıldı.", userId);
+                return Ok(new
+                {
+                    Message = "Konum bilgileri başarıyla güncellendi. Son 15 dakika içinde hesaplama yapıldığı için önbellekteki veri kullanıldı.",
+                    LatestRisk = new
+                    {
+                        latestAlert.DiseaseName,
+                        latestAlert.RiskPercentage,
+                        latestAlert.RiskLevel,
+                        latestAlert.Suggestion,
+                        CalculatedAt = DateTime.SpecifyKind(latestAlert.CalculatedAt, DateTimeKind.Utc)
+                    }
+                });
+            }
 
             // UX Geliştirmesi: Kullanıcı konumunu güncellediğinde, arka plan servisini beklemeden
             // anında hava durumu tahminini çekip riskini hesaplayalım ve veritabanına ekleyelim.

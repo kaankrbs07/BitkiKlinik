@@ -58,6 +58,15 @@ const adminMenuItems = [
     bgColor: COLORS.amberLight,
     route: '/(admin)/active-learning',
   },
+  {
+    id: 'hangfire',
+    title: 'Arka Plan İşleri (Hangfire)',
+    subtitle: 'Kuyruk durumlarını, e-posta ve bildirim işlerini yönet',
+    icon: 'time',
+    color: '#8b5cf6',
+    bgColor: '#f5f3ff',
+    route: '/(admin)/hangfire',
+  },
 ];
 
 export default function AdminDashboardScreen() {

@@ -12,6 +12,7 @@ import {
   ScrollView,
   StatusBar,
   Alert,
+  Modal,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
@@ -20,6 +21,7 @@ import * as ImagePicker from 'expo-image-picker';
 import Animated, { FadeInDown, FadeInUp } from 'react-native-reanimated';
 
 import { useProfile } from '../hooks/useProfile';
+import { dotnetClient } from '../api/client';
 import { CONFIG } from '../constants/config';
 
 // Premium Color Palette
@@ -58,6 +60,72 @@ export default function ProfileScreen() {
   // Validation / Message States
   const [validationError, setValidationError] = useState<string | null>(null);
   const [showSuccessToast, setShowSuccessToast] = useState(false);
+
+  // ─── Şifre Yenileme (Profile) State ───────────────────────────────
+  const [showResetModal, setShowResetModal] = useState(false);
+  const [resetCode, setResetCode] = useState('');
+  const [newPassword, setNewPassword] = useState('');
+  const [resetStep, setResetStep] = useState<1 | 2>(1);
+  const [resetLoading, setResetLoading] = useState(false);
+
+  // ─── Fotoğraf Önizleme State ──────────────────────────────────────
+  const [showImagePreviewModal, setShowImagePreviewModal] = useState(false);
+
+  // Sıfırlama Kodu İsteme (Kullanıcı zaten giriş yaptığı için email profile'dan alınır)
+  const handleRequestResetCode = async () => {
+    if (!profile?.email) {
+      Alert.alert('Hata', 'Kullanıcı e-posta adresi bulunamadı.');
+      return;
+    }
+
+    setResetLoading(true);
+    try {
+      const response = await dotnetClient.post('/Auth/forgot-password', { email: profile.email });
+      Alert.alert('Kod Gönderildi', response.data?.message ?? '6 haneli doğrulama kodunuz e-posta adresinize gönderildi.');
+      setResetStep(2);
+    } catch (err: any) {
+      const msg = err.response?.data?.message ?? 'Kod gönderilemedi. Lütfen internet bağlantınızı kontrol edin.';
+      Alert.alert('Hata', msg);
+    } finally {
+      setResetLoading(false);
+    }
+  };
+
+  // Kodu Doğrulayıp Şifreyi Güncelleme
+  const handleVerifyAndResetPassword = async () => {
+    if (!profile?.email) return;
+
+    if (!resetCode || !newPassword) {
+      Alert.alert('Hata', 'Lütfen 6 haneli doğrulama kodunu ve yeni şifrenizi girin.');
+      return;
+    }
+
+    if (newPassword.length < 8) {
+      Alert.alert('Hata', 'Yeni şifreniz en az 8 karakter olmalıdır.');
+      return;
+    }
+
+    setResetLoading(true);
+    try {
+      const response = await dotnetClient.post('/Auth/reset-password', {
+        email: profile.email,
+        code: resetCode,
+        newPassword: newPassword,
+      });
+      Alert.alert('Başarılı', response.data?.message ?? 'Şifreniz başarıyla güncellendi.');
+      
+      // Modalı Kapat & State'leri Temizle
+      setShowResetModal(false);
+      setResetCode('');
+      setNewPassword('');
+      setResetStep(1);
+    } catch (err: any) {
+      const msg = err.response?.data?.message ?? 'Şifre güncellenemedi.';
+      Alert.alert('Şifre Yenileme Başarısız', msg);
+    } finally {
+      setResetLoading(false);
+    }
+  };
 
   // Fetch Profile on Mount
   useEffect(() => {
@@ -242,13 +310,24 @@ export default function ProfileScreen() {
               {/* Avatar Section */}
               <Animated.View entering={FadeInDown.duration(600)} style={styles.avatarSection}>
                 <View style={styles.avatarWrapper}>
-                  {hasPhoto ? (
-                    <Image source={getAvatarSource()!} style={styles.avatarImage} />
-                  ) : (
-                    <View style={styles.avatarPlaceholder}>
-                      <Text style={styles.avatarPlaceholderText}>{getInitials()}</Text>
-                    </View>
-                  )}
+                  <TouchableOpacity
+                    onPress={() => {
+                      if (hasPhoto) {
+                        setShowImagePreviewModal(true);
+                      } else {
+                        handleSelectImage();
+                      }
+                    }}
+                    activeOpacity={0.9}
+                  >
+                    {hasPhoto ? (
+                      <Image source={getAvatarSource()!} style={styles.avatarImage} />
+                    ) : (
+                      <View style={styles.avatarPlaceholder}>
+                        <Text style={styles.avatarPlaceholderText}>{getInitials()}</Text>
+                      </View>
+                    )}
+                  </TouchableOpacity>
                   <TouchableOpacity
                     onPress={handleSelectImage}
                     style={styles.editBadge}
@@ -335,6 +414,25 @@ export default function ProfileScreen() {
                   </Text>
                 </View>
 
+                {/* Şifre Güvenliği & Yenileme */}
+                <View style={styles.inputGroup}>
+                  <View style={styles.labelRow}>
+                    <Text style={styles.label}>Hesap Güvenliği</Text>
+                  </View>
+                  <TouchableOpacity 
+                    style={styles.changePasswordButton}
+                    onPress={() => setShowResetModal(true)}
+                    activeOpacity={0.8}
+                  >
+                    <Ionicons name="key-outline" size={20} color={COLORS.emerald} style={{ marginRight: 8 }} />
+                    <Text style={styles.changePasswordButtonText}>Şifreyi Yenile / Değiştir</Text>
+                    <Ionicons name="chevron-forward" size={16} color={COLORS.slateLight} style={{ marginLeft: 'auto' }} />
+                  </TouchableOpacity>
+                  <Text style={styles.helperText}>
+                    Şifrenizi değiştirmek için kayıtlı e-posta adresinize doğrulama kodu gönderilecektir.
+                  </Text>
+                </View>
+
                 {/* Additional Profile Info Cards (Display only) */}
                 <View style={styles.infoRow}>
                   <View style={styles.infoCard}>
@@ -382,6 +480,127 @@ export default function ProfileScreen() {
             </ScrollView>
           </KeyboardAvoidingView>
         )}
+
+        {/* ─── Şifre Yenileme Bottom Modal (Premium UI) ─── */}
+        <Modal visible={showResetModal} animationType="slide" transparent>
+          <View style={styles.modalOverlay}>
+            <View style={styles.modalContent}>
+              <View style={styles.modalDragBar} />
+              
+              <View style={styles.modalHeader}>
+                <Text style={styles.modalTitle}>Şifre Yenileme 🔑</Text>
+                <TouchableOpacity onPress={() => { setShowResetModal(false); setResetStep(1); }}>
+                  <Ionicons name="close-circle" size={26} color="#666" />
+                </TouchableOpacity>
+              </View>
+
+              <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.modalScroll}>
+                {resetStep === 1 ? (
+                  // ADIM 1: Kod Gönderimi Onayı
+                  <View>
+                    <Text style={styles.modalInfo}>
+                      Şifrenizi güvenle yenilemek için kayıtlı e-posta adresiniz olan <Text style={{ fontWeight: 'bold', color: COLORS.slate }}>{profile?.email}</Text> adresine 6 haneli bir güvenlik kodu gönderilecektir. Onaylıyor musunuz?
+                    </Text>
+
+                    <TouchableOpacity 
+                      style={styles.modalButton} 
+                      onPress={handleRequestResetCode} 
+                      disabled={resetLoading}
+                    >
+                      {resetLoading ? (
+                        <ActivityIndicator color="white" />
+                      ) : (
+                        <>
+                          <Ionicons name="mail-outline" size={20} color="white" style={{ marginRight: 8 }} />
+                          <Text style={styles.modalButtonTxt}>Güvenlik Kodu Gönder</Text>
+                        </>
+                      )}
+                    </TouchableOpacity>
+                  </View>
+                ) : (
+                  // ADIM 2: Kod ve Yeni Şifre Girişi
+                  <View>
+                    <Text style={styles.modalInfo}>
+                      <Text style={{ fontWeight: 'bold', color: COLORS.emerald }}>{profile?.email}</Text> adresine gönderilen 6 haneli güvenlik kodunu ve yeni şifrenizi girin.
+                    </Text>
+
+                    <TextInput
+                      style={styles.modalInput}
+                      placeholder="6 Haneli Doğrulama Kodu"
+                      placeholderTextColor="#999"
+                      value={resetCode}
+                      onChangeText={code => setResetCode(code.replace(/[^0-9]/g, ''))}
+                      keyboardType="number-pad"
+                      maxLength={6}
+                    />
+
+                    <TextInput
+                      style={styles.modalInput}
+                      placeholder="Yeni Şifreniz (Min 8 Karakter)"
+                      placeholderTextColor="#999"
+                      value={newPassword}
+                      onChangeText={setNewPassword}
+                      secureTextEntry
+                    />
+
+                    <TouchableOpacity 
+                      style={[styles.modalButton, { backgroundColor: COLORS.emerald }]} 
+                      onPress={handleVerifyAndResetPassword} 
+                      disabled={resetLoading}
+                    >
+                      {resetLoading ? (
+                        <ActivityIndicator color="white" />
+                      ) : (
+                        <>
+                          <Ionicons name="checkmark-circle-outline" size={20} color="white" style={{ marginRight: 8 }} />
+                          <Text style={styles.modalButtonTxt}>Şifremi Sıfırla & Güncelle</Text>
+                        </>
+                      )}
+                    </TouchableOpacity>
+
+                    <TouchableOpacity 
+                      style={styles.backToStep1Btn} 
+                      onPress={() => setResetStep(1)}
+                      disabled={resetLoading}
+                    >
+                      <Text style={styles.backToStep1Txt}>Geri Dön</Text>
+                    </TouchableOpacity>
+                  </View>
+                )}
+              </ScrollView>
+            </View>
+          </View>
+        </Modal>
+        {/* ─── Orijinal Fotoğraf Önizleme Modalı (Full Screen) ─── */}
+        <Modal visible={showImagePreviewModal} transparent animationType="fade">
+          <View style={styles.previewOverlay}>
+            <TouchableOpacity 
+              style={styles.previewCloseBtn} 
+              onPress={() => setShowImagePreviewModal(false)}
+              activeOpacity={0.8}
+            >
+              <Ionicons name="close" size={28} color="#fff" />
+            </TouchableOpacity>
+            
+            {hasPhoto && (
+              <ScrollView
+                style={{ width: '100%', height: '100%' }}
+                contentContainerStyle={{ flexGrow: 1, justifyContent: 'center', alignItems: 'center' }}
+                minimumZoomScale={1}
+                maximumZoomScale={4}
+                bouncesZoom={true}
+                showsHorizontalScrollIndicator={false}
+                showsVerticalScrollIndicator={false}
+              >
+                <Image 
+                  source={getAvatarSource()!} 
+                  style={styles.previewImage} 
+                  resizeMode="contain" 
+                />
+              </ScrollView>
+            )}
+          </View>
+        </Modal>
       </SafeAreaView>
     </View>
   );
@@ -430,8 +649,8 @@ const styles = StyleSheet.create({
     color: COLORS.slateLight,
   },
   scrollContent: {
-    padding: 20,
-    paddingBottom: 40,
+    padding: 18,
+    paddingBottom: 16,
   },
   successBanner: {
     flexDirection: 'row',
@@ -462,7 +681,7 @@ const styles = StyleSheet.create({
   },
   avatarSection: {
     alignItems: 'center',
-    marginBottom: 28,
+    marginBottom: 12,
   },
   avatarWrapper: {
     position: 'relative',
@@ -473,16 +692,16 @@ const styles = StyleSheet.create({
     elevation: 4,
   },
   avatarImage: {
-    width: 110,
-    height: 110,
-    borderRadius: 55,
+    width: 108,
+    height: 108,
+    borderRadius: 54,
     borderWidth: 3,
     borderColor: COLORS.white,
   },
   avatarPlaceholder: {
-    width: 110,
-    height: 110,
-    borderRadius: 55,
+    width: 108,
+    height: 108,
+    borderRadius: 54,
     backgroundColor: COLORS.slate,
     justifyContent: 'center',
     alignItems: 'center',
@@ -490,7 +709,7 @@ const styles = StyleSheet.create({
     borderColor: COLORS.white,
   },
   avatarPlaceholderText: {
-    fontSize: 32,
+    fontSize: 34,
     fontWeight: '700',
     color: COLORS.white,
     letterSpacing: 1,
@@ -515,7 +734,7 @@ const styles = StyleSheet.create({
   },
   photoActions: {
     flexDirection: 'row',
-    marginTop: 16,
+    marginTop: 8,
     alignItems: 'center',
   },
   selectButton: {
@@ -544,21 +763,21 @@ const styles = StyleSheet.create({
   formContainer: {
     backgroundColor: COLORS.white,
     borderRadius: 16,
-    padding: 16,
+    padding: 12,
     shadowColor: COLORS.slate,
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.05,
     shadowRadius: 6,
     elevation: 2,
-    marginBottom: 24,
+    marginBottom: 12,
   },
   inputGroup: {
-    marginBottom: 20,
+    marginBottom: 12,
   },
   labelRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 8,
+    marginBottom: 4,
   },
   label: {
     fontSize: 14,
@@ -593,7 +812,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: COLORS.border,
     paddingHorizontal: 12,
-    height: 48,
+    height: 42,
   },
   inputWrapperError: {
     borderColor: COLORS.danger,
@@ -619,19 +838,19 @@ const styles = StyleSheet.create({
   helperText: {
     fontSize: 11,
     color: COLORS.slateLight,
-    marginTop: 6,
+    marginTop: 4,
     lineHeight: 14,
   },
   infoRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    marginTop: 8,
+    marginTop: 4,
   },
   infoCard: {
     flex: 0.48,
     backgroundColor: COLORS.background,
     borderRadius: 12,
-    padding: 12,
+    padding: 8,
     alignItems: 'center',
     borderWidth: 1,
     borderColor: COLORS.border,
@@ -639,21 +858,21 @@ const styles = StyleSheet.create({
   infoCardLabel: {
     fontSize: 11,
     color: COLORS.slateLight,
-    marginTop: 6,
+    marginTop: 3,
     fontWeight: '500',
   },
   infoCardVal: {
     fontSize: 13,
     color: COLORS.slate,
     fontWeight: '700',
-    marginTop: 2,
+    marginTop: 0,
   },
   actionContainer: {
-    marginBottom: 20,
+    marginBottom: 10,
   },
   saveButton: {
     backgroundColor: COLORS.emerald,
-    height: 52,
+    height: 44,
     borderRadius: 12,
     justifyContent: 'center',
     alignItems: 'center',
@@ -680,5 +899,119 @@ const styles = StyleSheet.create({
     color: '#64748b',
     textAlign: 'center',
     marginTop: 8,
+  },
+  changePasswordButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: COLORS.inputBg,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: COLORS.border,
+    paddingHorizontal: 12,
+    height: 48,
+  },
+  changePasswordButtonText: {
+    fontSize: 15,
+    fontWeight: '600',
+    color: COLORS.slate,
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    justifyContent: 'flex-end',
+  },
+  modalContent: {
+    backgroundColor: COLORS.white,
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    paddingHorizontal: 24,
+    paddingTop: 12,
+    paddingBottom: 40,
+    maxHeight: '80%',
+  },
+  modalDragBar: {
+    width: 40,
+    height: 4,
+    backgroundColor: '#e2e8f0',
+    borderRadius: 2,
+    alignSelf: 'center',
+    marginBottom: 16,
+  },
+  modalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    borderBottomWidth: 1,
+    borderBottomColor: '#f1f5f9',
+    paddingBottom: 16,
+    marginBottom: 16,
+  },
+  modalTitle: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    color: '#0f172a',
+  },
+  modalScroll: {
+    paddingBottom: 24,
+  },
+  modalInfo: {
+    fontSize: 14,
+    color: '#64748b',
+    lineHeight: 20,
+    marginBottom: 20,
+  },
+  modalInput: {
+    backgroundColor: '#f1f5f9',
+    padding: 16,
+    borderRadius: 12,
+    marginBottom: 16,
+    fontSize: 16,
+    color: '#333',
+  },
+  modalButton: {
+    backgroundColor: '#6366f1',
+    padding: 16,
+    borderRadius: 12,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: 8,
+  },
+  modalButtonTxt: {
+    color: 'white',
+    fontSize: 16,
+    fontWeight: 'bold',
+  },
+  backToStep1Btn: {
+    alignItems: 'center',
+    marginTop: 16,
+    padding: 8,
+  },
+  backToStep1Txt: {
+    color: '#64748b',
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  previewOverlay: {
+    flex: 1,
+    backgroundColor: '#000000',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  previewCloseBtn: {
+    position: 'absolute',
+    top: Platform.OS === 'ios' ? 60 : 30,
+    right: 20,
+    zIndex: 10,
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: 'rgba(255,255,255,0.2)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  previewImage: {
+    width: '100%',
+    height: '100%',
   },
 });

@@ -54,6 +54,12 @@ public class DashboardService : IDashboardService
             })
             .ToListAsync();
 
+        // ── 2.1. Zaman Dilimi Standardizasyonu ───────────────────────────
+        foreach (var scan in recentScans)
+        {
+            scan.ScanDate = DateTime.SpecifyKind(scan.ScanDate, DateTimeKind.Utc);
+        }
+
         _logger.LogInformation(
             "Dashboard verisi hazırlandı → UserId: {UserId}, Toplam: {Total}, Sağlıklı: {Healthy}, Riskli: {Risky}",
             userId, totalScans, healthyCount, riskyCount);

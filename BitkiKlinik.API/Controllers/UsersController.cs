@@ -277,7 +277,7 @@ public class UsersController : ControllerBase
             Id         = user.Id,
             Username   = user.Username,
             Email      = user.Email,
-            CreatedAt  = user.CreatedAt,
+            CreatedAt  = DateTime.SpecifyKind(user.CreatedAt, DateTimeKind.Utc),
             IsActive   = user.IsActive,
             IsVerified = user.IsVerified,
             Role       = user.Role.ToString()

@@ -283,7 +283,7 @@ public class ChatController : ControllerBase
                         PlantName = scan != null ? scan.PlantName : "Genel Danışmanlık",
                         DiseaseName = scan != null ? scan.DiseaseName : "Genel Bitki Soruları",
                         LastMessage = lastMsg.Content.Length > 80 ? lastMsg.Content.Substring(0, 80) + "..." : lastMsg.Content,
-                        LastMessageDate = s.MaxDate,
+                        LastMessageDate = DateTime.SpecifyKind(s.MaxDate, DateTimeKind.Utc),
                         IsHealthy = scan == null || scan.Status == Models.Enums.ScanStatus.Healthy,
                         ImageUrl = scan != null ? scan.ImageUrl : null
                     };
