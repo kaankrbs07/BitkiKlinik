@@ -17,6 +17,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
+import { useAppTheme } from '../hooks/useAppTheme';
 import * as ImagePicker from 'expo-image-picker';
 import Animated, { FadeInDown, FadeInUp } from 'react-native-reanimated';
 
@@ -24,8 +25,8 @@ import { useProfile } from '../hooks/useProfile';
 import { dotnetClient } from '../api/client';
 import { CONFIG } from '../constants/config';
 
-// Premium Color Palette
-const COLORS = {
+// Premium Light & Dark Color Palettes
+const LIGHT_COLORS = {
   emerald: '#10b981',
   emeraldLight: '#dcfce7',
   slate: '#0f172a',
@@ -39,8 +40,25 @@ const COLORS = {
   border: '#e2e8f0',
 };
 
+const DARK_COLORS = {
+  emerald: '#10b981',
+  emeraldLight: '#064e3b',
+  slate: '#f8fafc',
+  slateLight: '#94a3b8',
+  background: '#0f172a',
+  white: '#1e293b',
+  warning: '#fbbf24',
+  danger: '#f87171',
+  dangerLight: '#7f1d1d',
+  inputBg: '#334155',
+  border: '#334155',
+};
+
 export default function ProfileScreen() {
   const router = useRouter();
+  const { theme, resolvedTheme, isDark, setTheme } = useAppTheme();
+  const colors = isDark ? DARK_COLORS : LIGHT_COLORS;
+  const styles = getStyles(colors);
   const {
     profile,
     isLoading,
@@ -258,7 +276,7 @@ export default function ProfileScreen() {
 
   return (
     <View style={styles.container}>
-      <StatusBar barStyle="dark-content" />
+      <StatusBar barStyle={isDark ? 'light-content' : 'dark-content'} />
       <SafeAreaView style={styles.safeArea}>
         
         {/* Modern Premium Header */}
@@ -268,7 +286,7 @@ export default function ProfileScreen() {
             style={styles.backButton}
             activeOpacity={0.7}
           >
-            <Ionicons name="arrow-back" size={24} color={COLORS.slate} />
+            <Ionicons name="arrow-back" size={24} color={colors.slate} />
           </TouchableOpacity>
           <Text style={styles.headerTitle}>Profili Düzenle</Text>
           <View style={styles.headerPlaceholder} />
@@ -277,7 +295,7 @@ export default function ProfileScreen() {
         {/* Loading Indicator for initial profile fetch */}
         {isLoading && !profile ? (
           <View style={styles.loadingCenter}>
-            <ActivityIndicator size="large" color={COLORS.emerald} />
+            <ActivityIndicator size="large" color={colors.emerald} />
             <Text style={styles.loadingText}>Profil yükleniyor...</Text>
           </View>
         ) : (
@@ -286,22 +304,24 @@ export default function ProfileScreen() {
             style={{ flex: 1 }}
           >
             <ScrollView
+              style={{ flex: 1 }}
               contentContainerStyle={styles.scrollContent}
               showsVerticalScrollIndicator={false}
               keyboardShouldPersistTaps="handled"
+              scrollEnabled={false}
             >
               {/* Dynamic Notification Banners */}
               {showSuccessToast && (
                 <Animated.View entering={FadeInUp} style={styles.successBanner}>
-                  <Ionicons name="checkmark-circle" size={20} color={COLORS.emerald} />
+                  <Ionicons name="checkmark-circle" size={20} color={colors.emerald} />
                   <Text style={styles.bannerText}>Profil başarıyla güncellendi!</Text>
                 </Animated.View>
               )}
 
               {(validationError || apiError) && (
                 <Animated.View entering={FadeInUp} style={styles.errorBanner}>
-                  <Ionicons name="alert-circle" size={20} color={COLORS.danger} />
-                  <Text style={[styles.bannerText, { color: COLORS.danger }]}>
+                  <Ionicons name="alert-circle" size={20} color={colors.danger} />
+                  <Text style={[styles.bannerText, { color: colors.danger }]}>
                     {validationError || apiError}
                   </Text>
                 </Animated.View>
@@ -328,6 +348,15 @@ export default function ProfileScreen() {
                       </View>
                     )}
                   </TouchableOpacity>
+                  {hasPhoto && (
+                    <TouchableOpacity
+                      onPress={handleRemoveImage}
+                      style={styles.deleteBadge}
+                      activeOpacity={0.8}
+                    >
+                      <Ionicons name="trash" size={18} color="#fff" />
+                    </TouchableOpacity>
+                  )}
                   <TouchableOpacity
                     onPress={handleSelectImage}
                     style={styles.editBadge}
@@ -335,26 +364,6 @@ export default function ProfileScreen() {
                   >
                     <Ionicons name="camera" size={18} color="#fff" />
                   </TouchableOpacity>
-                </View>
-
-                {/* Photo Actions */}
-                <View style={styles.photoActions}>
-                  <TouchableOpacity
-                    onPress={handleSelectImage}
-                    style={styles.selectButton}
-                    activeOpacity={0.7}
-                  >
-                    <Text style={styles.selectButtonText}>Fotoğraf Değiştir</Text>
-                  </TouchableOpacity>
-                  {hasPhoto && (
-                    <TouchableOpacity
-                      onPress={handleRemoveImage}
-                      style={styles.removeButton}
-                      activeOpacity={0.7}
-                    >
-                      <Text style={styles.removeButtonText}>Kaldır</Text>
-                    </TouchableOpacity>
-                  )}
                 </View>
               </Animated.View>
 
@@ -371,7 +380,7 @@ export default function ProfileScreen() {
                     styles.inputWrapper,
                     (validationError || apiError) ? styles.inputWrapperError : null
                   ]}>
-                    <Ionicons name="person-outline" size={20} color={COLORS.slateLight} style={styles.inputIcon} />
+                    <Ionicons name="person-outline" size={20} color={colors.slateLight} style={styles.inputIcon} />
                     <TextInput
                       style={styles.input}
                       placeholder="kullanici_adi"
@@ -396,12 +405,12 @@ export default function ProfileScreen() {
                   <View style={styles.labelRow}>
                     <Text style={styles.label}>E-Posta Adresi</Text>
                     <View style={styles.readOnlyBadge}>
-                      <Ionicons name="lock-closed" size={10} color={COLORS.slateLight} />
+                      <Ionicons name="lock-closed" size={10} color={colors.slateLight} />
                       <Text style={styles.readOnlyBadgeText}>Değiştirilemez</Text>
                     </View>
                   </View>
                   <View style={[styles.inputWrapper, styles.inputDisabled]}>
-                    <Ionicons name="mail-outline" size={20} color="#94a3b8" style={styles.inputIcon} />
+                    <Ionicons name="mail-outline" size={20} color={colors.slateLight} style={styles.inputIcon} />
                     <TextInput
                       style={[styles.input, styles.textDisabled]}
                       value={profile?.email}
@@ -424,24 +433,104 @@ export default function ProfileScreen() {
                     onPress={() => setShowResetModal(true)}
                     activeOpacity={0.8}
                   >
-                    <Ionicons name="key-outline" size={20} color={COLORS.emerald} style={{ marginRight: 8 }} />
-                    <Text style={styles.changePasswordButtonText}>Şifreyi Yenile / Değiştir</Text>
-                    <Ionicons name="chevron-forward" size={16} color={COLORS.slateLight} style={{ marginLeft: 'auto' }} />
+                    <Ionicons name="key-outline" size={20} color={colors.emerald} style={{ marginRight: 8 }} />
+                    <Text style={styles.changePasswordButtonText}>Şifreyi Yenile</Text>
+                    <Ionicons name="chevron-forward" size={16} color={colors.slateLight} style={{ marginLeft: 'auto' }} />
                   </TouchableOpacity>
                   <Text style={styles.helperText}>
-                    Şifrenizi değiştirmek için kayıtlı e-posta adresinize doğrulama kodu gönderilecektir.
+                    Kayıtlı e-posta adresinize doğrulama kodu gönderilecektir.
+                  </Text>
+                </View>
+
+                {/* Tema / Görünüm Seçimi */}
+                <View style={styles.inputGroup}>
+                  <View style={styles.labelRow}>
+                    <Text style={styles.label}>Görünüm ve Tema</Text>
+                  </View>
+                  <View style={styles.themeSelectorContainer}>
+                    <TouchableOpacity
+                      style={[
+                        styles.themeOption,
+                        theme === 'light' && styles.themeOptionActive,
+                      ]}
+                      onPress={() => setTheme('light')}
+                      activeOpacity={0.8}
+                    >
+                      <Ionicons
+                        name="sunny"
+                        size={16}
+                        color={theme === 'light' ? colors.white : colors.slateLight}
+                      />
+                      <Text
+                        style={[
+                          styles.themeOptionText,
+                          theme === 'light' && styles.themeOptionTextActive,
+                        ]}
+                      >
+                        Açık
+                      </Text>
+                    </TouchableOpacity>
+
+                    <TouchableOpacity
+                      style={[
+                        styles.themeOption,
+                        theme === 'dark' && styles.themeOptionActive,
+                      ]}
+                      onPress={() => setTheme('dark')}
+                      activeOpacity={0.8}
+                    >
+                      <Ionicons
+                        name="moon"
+                        size={16}
+                        color={theme === 'dark' ? colors.white : colors.slateLight}
+                      />
+                      <Text
+                        style={[
+                          styles.themeOptionText,
+                          theme === 'dark' && styles.themeOptionTextActive,
+                        ]}
+                      >
+                        Koyu
+                      </Text>
+                    </TouchableOpacity>
+
+                    <TouchableOpacity
+                      style={[
+                        styles.themeOption,
+                        theme === 'system' && styles.themeOptionActive,
+                      ]}
+                      onPress={() => setTheme('system')}
+                      activeOpacity={0.8}
+                    >
+                      <Ionicons
+                        name="settings-outline"
+                        size={16}
+                        color={theme === 'system' ? colors.white : colors.slateLight}
+                      />
+                      <Text
+                        style={[
+                          styles.themeOptionText,
+                          theme === 'system' && styles.themeOptionTextActive,
+                        ]}
+                      >
+                        Sistem
+                      </Text>
+                    </TouchableOpacity>
+                  </View>
+                  <Text style={styles.helperText}>
+                    Uygulamanın açık veya koyu tema görünümünü değiştirebilirsiniz.
                   </Text>
                 </View>
 
                 {/* Additional Profile Info Cards (Display only) */}
                 <View style={styles.infoRow}>
                   <View style={styles.infoCard}>
-                    <Ionicons name="shield-outline" size={20} color={COLORS.emerald} />
+                    <Ionicons name="shield-outline" size={20} color={colors.emerald} />
                     <Text style={styles.infoCardLabel}>Rol</Text>
                     <Text style={styles.infoCardVal}>{profile?.role === 'Admin' ? 'Yönetici' : 'Kullanıcı'}</Text>
                   </View>
                   <View style={styles.infoCard}>
-                    <Ionicons name="calendar-outline" size={20} color={COLORS.emerald} />
+                    <Ionicons name="calendar-outline" size={20} color={colors.emerald} />
                     <Text style={styles.infoCardLabel}>Üyelik Tarihi</Text>
                     <Text style={styles.infoCardVal}>
                       {profile ? new Date(profile.createdAt).toLocaleDateString('tr-TR', { year: 'numeric', month: 'short' }) : '-'}
@@ -499,7 +588,7 @@ export default function ProfileScreen() {
                   // ADIM 1: Kod Gönderimi Onayı
                   <View>
                     <Text style={styles.modalInfo}>
-                      Şifrenizi güvenle yenilemek için kayıtlı e-posta adresiniz olan <Text style={{ fontWeight: 'bold', color: COLORS.slate }}>{profile?.email}</Text> adresine 6 haneli bir güvenlik kodu gönderilecektir. Onaylıyor musunuz?
+                      Şifrenizi güvenle yenilemek için kayıtlı e-posta adresiniz olan <Text style={{ fontWeight: 'bold', color: colors.slate }}>{profile?.email}</Text> adresine 6 haneli bir güvenlik kodu gönderilecektir. Onaylıyor musunuz?
                     </Text>
 
                     <TouchableOpacity 
@@ -521,7 +610,7 @@ export default function ProfileScreen() {
                   // ADIM 2: Kod ve Yeni Şifre Girişi
                   <View>
                     <Text style={styles.modalInfo}>
-                      <Text style={{ fontWeight: 'bold', color: COLORS.emerald }}>{profile?.email}</Text> adresine gönderilen 6 haneli güvenlik kodunu ve yeni şifrenizi girin.
+                      <Text style={{ fontWeight: 'bold', color: colors.emerald }}>{profile?.email}</Text> adresine gönderilen 6 haneli güvenlik kodunu ve yeni şifrenizi girin.
                     </Text>
 
                     <TextInput
@@ -544,7 +633,7 @@ export default function ProfileScreen() {
                     />
 
                     <TouchableOpacity 
-                      style={[styles.modalButton, { backgroundColor: COLORS.emerald }]} 
+                      style={[styles.modalButton, { backgroundColor: colors.emerald }]} 
                       onPress={handleVerifyAndResetPassword} 
                       disabled={resetLoading}
                     >
@@ -606,10 +695,10 @@ export default function ProfileScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const getStyles = (colors: typeof LIGHT_COLORS) => StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: COLORS.background,
+    backgroundColor: colors.background,
   },
   safeArea: {
     flex: 1,
@@ -621,18 +710,18 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingVertical: 12,
     borderBottomWidth: 1,
-    borderBottomColor: COLORS.border,
-    backgroundColor: COLORS.white,
+    borderBottomColor: colors.border,
+    backgroundColor: colors.white,
   },
   backButton: {
     padding: 8,
     borderRadius: 8,
-    backgroundColor: COLORS.background,
+    backgroundColor: colors.background,
   },
   headerTitle: {
     fontSize: 18,
     fontWeight: '700',
-    color: COLORS.slate,
+    color: colors.slate,
     fontFamily: Platform.OS === 'ios' ? 'System' : 'sans-serif-medium',
   },
   headerPlaceholder: {
@@ -646,16 +735,18 @@ const styles = StyleSheet.create({
   loadingText: {
     marginTop: 12,
     fontSize: 14,
-    color: COLORS.slateLight,
+    color: colors.slateLight,
   },
   scrollContent: {
-    padding: 18,
+    padding: 16,
     paddingBottom: 16,
+    flexGrow: 1,
+    justifyContent: 'space-between',
   },
   successBanner: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: COLORS.emeraldLight,
+    backgroundColor: colors.emeraldLight,
     padding: 14,
     borderRadius: 12,
     marginBottom: 20,
@@ -665,7 +756,7 @@ const styles = StyleSheet.create({
   errorBanner: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: COLORS.dangerLight,
+    backgroundColor: colors.dangerLight,
     padding: 14,
     borderRadius: 12,
     marginBottom: 20,
@@ -675,104 +766,94 @@ const styles = StyleSheet.create({
   bannerText: {
     fontSize: 14,
     fontWeight: '600',
-    color: COLORS.emerald,
+    color: colors.emerald,
     marginLeft: 8,
     flex: 1,
   },
   avatarSection: {
     alignItems: 'center',
-    marginBottom: 12,
+    marginBottom: 18,
   },
   avatarWrapper: {
     position: 'relative',
-    shadowColor: COLORS.slate,
+    shadowColor: colors.slate,
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.1,
     shadowRadius: 8,
     elevation: 4,
   },
   avatarImage: {
-    width: 108,
-    height: 108,
-    borderRadius: 54,
+    width: 120,
+    height: 120,
+    borderRadius: 60,
     borderWidth: 3,
-    borderColor: COLORS.white,
+    borderColor: colors.white,
   },
   avatarPlaceholder: {
-    width: 108,
-    height: 108,
-    borderRadius: 54,
-    backgroundColor: COLORS.slate,
+    width: 120,
+    height: 120,
+    borderRadius: 60,
+    backgroundColor: colors.slate,
     justifyContent: 'center',
     alignItems: 'center',
     borderWidth: 3,
-    borderColor: COLORS.white,
+    borderColor: colors.white,
   },
   avatarPlaceholderText: {
-    fontSize: 34,
+    fontSize: 38,
     fontWeight: '700',
-    color: COLORS.white,
+    color: colors.white,
     letterSpacing: 1,
   },
   editBadge: {
     position: 'absolute',
-    bottom: 2,
-    right: 2,
-    backgroundColor: COLORS.emerald,
-    width: 32,
-    height: 32,
-    borderRadius: 16,
+    bottom: 4,
+    right: 4,
+    backgroundColor: colors.emerald,
+    width: 34,
+    height: 34,
+    borderRadius: 17,
     justifyContent: 'center',
     alignItems: 'center',
     borderWidth: 2.5,
-    borderColor: COLORS.white,
+    borderColor: colors.white,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.2,
     shadowRadius: 3,
     elevation: 3,
   },
-  photoActions: {
-    flexDirection: 'row',
-    marginTop: 8,
+  deleteBadge: {
+    position: 'absolute',
+    bottom: 4,
+    left: 4,
+    backgroundColor: colors.danger,
+    width: 34,
+    height: 34,
+    borderRadius: 17,
+    justifyContent: 'center',
     alignItems: 'center',
-  },
-  selectButton: {
-    paddingVertical: 6,
-    paddingHorizontal: 16,
-    borderRadius: 20,
-    backgroundColor: COLORS.emeraldLight,
-  },
-  selectButtonText: {
-    fontSize: 13,
-    fontWeight: '600',
-    color: COLORS.emerald,
-  },
-  removeButton: {
-    marginLeft: 12,
-    paddingVertical: 6,
-    paddingHorizontal: 16,
-    borderRadius: 20,
-    backgroundColor: COLORS.dangerLight,
-  },
-  removeButtonText: {
-    fontSize: 13,
-    fontWeight: '600',
-    color: COLORS.danger,
+    borderWidth: 2.5,
+    borderColor: colors.white,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.2,
+    shadowRadius: 3,
+    elevation: 3,
   },
   formContainer: {
-    backgroundColor: COLORS.white,
+    backgroundColor: colors.white,
     borderRadius: 16,
-    padding: 12,
-    shadowColor: COLORS.slate,
+    padding: 10,
+    shadowColor: colors.slate,
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.05,
     shadowRadius: 6,
     elevation: 2,
-    marginBottom: 12,
+    marginBottom: 14,
   },
   inputGroup: {
-    marginBottom: 12,
+    marginBottom: 6,
   },
   labelRow: {
     flexDirection: 'row',
@@ -782,17 +863,17 @@ const styles = StyleSheet.create({
   label: {
     fontSize: 14,
     fontWeight: '600',
-    color: COLORS.slate,
+    color: colors.slate,
   },
   requiredMark: {
-    color: COLORS.danger,
+    color: colors.danger,
     marginLeft: 4,
     fontWeight: 'bold',
   },
   readOnlyBadge: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: COLORS.inputBg,
+    backgroundColor: colors.inputBg,
     paddingHorizontal: 8,
     paddingVertical: 2,
     borderRadius: 8,
@@ -800,27 +881,27 @@ const styles = StyleSheet.create({
   },
   readOnlyBadgeText: {
     fontSize: 10,
-    color: COLORS.slateLight,
+    color: colors.slateLight,
     fontWeight: '500',
     marginLeft: 4,
   },
   inputWrapper: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: COLORS.inputBg,
+    backgroundColor: colors.inputBg,
     borderRadius: 12,
     borderWidth: 1,
-    borderColor: COLORS.border,
+    borderColor: colors.border,
     paddingHorizontal: 12,
-    height: 42,
+    height: 38,
   },
   inputWrapperError: {
-    borderColor: COLORS.danger,
+    borderColor: colors.danger,
     backgroundColor: '#fff5f5',
   },
   inputDisabled: {
-    backgroundColor: '#f8fafc',
-    borderColor: '#e2e8f0',
+    backgroundColor: colors.background,
+    borderColor: colors.border,
   },
   inputIcon: {
     marginRight: 10,
@@ -828,7 +909,7 @@ const styles = StyleSheet.create({
   input: {
     flex: 1,
     fontSize: 15,
-    color: COLORS.slate,
+    color: colors.slate,
     height: '100%',
     padding: 0,
   },
@@ -837,7 +918,7 @@ const styles = StyleSheet.create({
   },
   helperText: {
     fontSize: 11,
-    color: COLORS.slateLight,
+    color: colors.slateLight,
     marginTop: 4,
     lineHeight: 14,
   },
@@ -848,35 +929,35 @@ const styles = StyleSheet.create({
   },
   infoCard: {
     flex: 0.48,
-    backgroundColor: COLORS.background,
+    backgroundColor: colors.background,
     borderRadius: 12,
-    padding: 8,
+    padding: 6,
     alignItems: 'center',
     borderWidth: 1,
-    borderColor: COLORS.border,
+    borderColor: colors.border,
   },
   infoCardLabel: {
     fontSize: 11,
-    color: COLORS.slateLight,
+    color: colors.slateLight,
     marginTop: 3,
     fontWeight: '500',
   },
   infoCardVal: {
     fontSize: 13,
-    color: COLORS.slate,
+    color: colors.slate,
     fontWeight: '700',
     marginTop: 0,
   },
   actionContainer: {
-    marginBottom: 10,
+    marginBottom: 14,
   },
   saveButton: {
-    backgroundColor: COLORS.emerald,
-    height: 44,
+    backgroundColor: colors.emerald,
+    height: 48,
     borderRadius: 12,
     justifyContent: 'center',
     alignItems: 'center',
-    shadowColor: COLORS.emerald,
+    shadowColor: colors.emerald,
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.15,
     shadowRadius: 8,
@@ -886,9 +967,9 @@ const styles = StyleSheet.create({
     backgroundColor: '#a7f3d0',
   },
   saveButtonText: {
-    fontSize: 16,
+    fontSize: 17,
     fontWeight: '700',
-    color: COLORS.white,
+    color: colors.white,
   },
   loadingRow: {
     flexDirection: 'row',
@@ -903,17 +984,17 @@ const styles = StyleSheet.create({
   changePasswordButton: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: COLORS.inputBg,
+    backgroundColor: colors.inputBg,
     borderRadius: 12,
     borderWidth: 1,
-    borderColor: COLORS.border,
+    borderColor: colors.border,
     paddingHorizontal: 12,
-    height: 48,
+    height: 40,
   },
   changePasswordButtonText: {
     fontSize: 15,
     fontWeight: '600',
-    color: COLORS.slate,
+    color: colors.slate,
   },
   modalOverlay: {
     flex: 1,
@@ -921,7 +1002,7 @@ const styles = StyleSheet.create({
     justifyContent: 'flex-end',
   },
   modalContent: {
-    backgroundColor: COLORS.white,
+    backgroundColor: colors.white,
     borderTopLeftRadius: 24,
     borderTopRightRadius: 24,
     paddingHorizontal: 24,
@@ -949,24 +1030,24 @@ const styles = StyleSheet.create({
   modalTitle: {
     fontSize: 20,
     fontWeight: 'bold',
-    color: '#0f172a',
+    color: colors.slate,
   },
   modalScroll: {
     paddingBottom: 24,
   },
   modalInfo: {
     fontSize: 14,
-    color: '#64748b',
+    color: colors.slateLight,
     lineHeight: 20,
     marginBottom: 20,
   },
   modalInput: {
-    backgroundColor: '#f1f5f9',
+    backgroundColor: colors.inputBg,
     padding: 16,
     borderRadius: 12,
     marginBottom: 16,
     fontSize: 16,
-    color: '#333',
+    color: colors.slate,
   },
   modalButton: {
     backgroundColor: '#6366f1',
@@ -988,7 +1069,7 @@ const styles = StyleSheet.create({
     padding: 8,
   },
   backToStep1Txt: {
-    color: '#64748b',
+    color: colors.slateLight,
     fontSize: 14,
     fontWeight: '600',
   },
@@ -1013,5 +1094,38 @@ const styles = StyleSheet.create({
   previewImage: {
     width: '100%',
     height: '100%',
+  },
+  themeSelectorContainer: {
+    flexDirection: 'row',
+    backgroundColor: colors.inputBg,
+    borderRadius: 12,
+    padding: 4,
+    marginTop: 6,
+    marginBottom: 6,
+  },
+  themeOption: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 6,
+    borderRadius: 8,
+    gap: 6,
+  },
+  themeOptionActive: {
+    backgroundColor: colors.emerald,
+    shadowColor: colors.emerald,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.15,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  themeOptionText: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: colors.slateLight,
+  },
+  themeOptionTextActive: {
+    color: colors.white,
   },
 });

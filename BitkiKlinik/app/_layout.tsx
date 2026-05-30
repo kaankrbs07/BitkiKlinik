@@ -8,6 +8,7 @@ import { jwtDecode } from 'jwt-decode';
 import { useShallow } from 'zustand/react/shallow';
 
 import { useColorScheme } from '@/hooks/use-color-scheme';
+import { useAppTheme } from '../hooks/useAppTheme';
 import { useAuthStore } from '../store/useAuthStore';
 import { NetworkBanner } from '../components/NetworkBanner';
 import { dotnetClient } from '../api/client';
@@ -34,7 +35,8 @@ function isTokenExpired(token: string): boolean {
 }
 
 export default function RootLayout() {
-  const colorScheme = useColorScheme();
+  const { resolvedTheme } = useAppTheme();
+  const colorScheme = resolvedTheme;
   const { isAuthenticated, isVerified, token, logout } = useAuthStore(
     useShallow((state) => ({
       isAuthenticated: state.isAuthenticated,

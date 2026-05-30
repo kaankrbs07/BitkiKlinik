@@ -20,9 +20,9 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 # Bağımlılıkları önce kopyala (Docker cache avantajı)
 COPY requirements.txt .
 
-# PyTorch GPU versiyonunu kuruyoruz
-RUN pip install --no-cache-dir torch torchvision torchaudio \
-    && pip install --no-cache-dir -r requirements.txt
+# PyTorch GPU versiyonunu kuruyoruz (yüksek zaman aşımı ve tekrar deneme ile kararlı hale getirildi)
+RUN pip install --no-cache-dir --default-timeout=1000 --retries 10 torch torchvision torchaudio \
+    && pip install --no-cache-dir --default-timeout=1000 --retries 10 -r requirements.txt
 
 # Uygulama kaynak kodunu kopyala
 COPY serve.py retrain.py retrain_worker.py ./

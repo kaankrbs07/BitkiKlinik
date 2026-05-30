@@ -16,6 +16,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useLocalSearchParams, useRouter } from 'expo-router';
+import { useAppTheme } from '../../hooks/useAppTheme';
 import { Ionicons } from '@expo/vector-icons';
 import { Image } from 'expo-image';
 import Animated, {
@@ -29,8 +30,8 @@ import { useAuthStore } from '../../store/useAuthStore';
 
 const { width } = Dimensions.get('window');
 
-// Premium Renk Paleti
-const COLORS = {
+// Premium Light & Dark Color Palettes
+const LIGHT_COLORS = {
   emerald: '#10b981',
   emeraldLight: '#dcfce7',
   slate: '#0f172a',
@@ -44,6 +45,23 @@ const COLORS = {
   purple: '#6366f1',
   purpleLight: '#e0e7ff',
 };
+
+const DARK_COLORS = {
+  emerald: '#10b981',
+  emeraldLight: '#064e3b',
+  slate: '#f8fafc',
+  slateLight: '#94a3b8',
+  background: '#0f172a',
+  white: '#1e293b',
+  warning: '#fbbf24',
+  danger: '#f87171',
+  dangerLight: '#7f1d1d',
+  border: '#334155',
+  purple: '#6366f1',
+  purpleLight: '#312e81',
+};
+
+const COLORS = LIGHT_COLORS;
 
 // Çip Kategorileri
 const CATEGORIES = [
@@ -102,6 +120,9 @@ interface ScanHistoryItem {
 
 export default function ExploreScreen() {
   const router = useRouter();
+  const { theme, resolvedTheme, isDark } = useAppTheme();
+  const COLORS = isDark ? DARK_COLORS : LIGHT_COLORS;
+  const styles = getStyles(COLORS, isDark);
   const params = useLocalSearchParams();
   const { isAuthenticated } = useAuthStore();
 
@@ -504,7 +525,7 @@ export default function ExploreScreen() {
 
   return (
     <View style={styles.container}>
-      <StatusBar barStyle="dark-content" />
+      <StatusBar barStyle={isDark ? "light-content" : "dark-content"} />
       <SafeAreaView style={{ flex: 1, backgroundColor: COLORS.background }}>
         
         {/* Header Title */}
@@ -681,7 +702,8 @@ export default function ExploreScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+function getStyles(COLORS: typeof LIGHT_COLORS, isDark: boolean) {
+  return StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: COLORS.background,
@@ -703,12 +725,14 @@ const styles = StyleSheet.create({
   },
   segmentedContainer: {
     flexDirection: 'row',
-    backgroundColor: '#f1f5f9',
+    backgroundColor: isDark ? '#1e293b' : '#f1f5f9',
     borderRadius: 14,
     padding: 4,
     marginHorizontal: 20,
     marginTop: 12,
     marginBottom: 16,
+    borderWidth: isDark ? 1 : 0,
+    borderColor: COLORS.border,
   },
   segmentButton: {
     flex: 1,
@@ -768,7 +792,7 @@ const styles = StyleSheet.create({
   categoryChip: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#eaeef2',
+    backgroundColor: isDark ? '#334155' : '#eaeef2',
     paddingHorizontal: 14,
     paddingVertical: 8,
     borderRadius: 20,
@@ -813,7 +837,7 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
   },
   expandedCard: {
-    borderColor: '#cbd5e1',
+    borderColor: isDark ? '#475569' : '#cbd5e1',
     shadowOpacity: 0.06,
     shadowRadius: 10,
   },
@@ -866,10 +890,12 @@ const styles = StyleSheet.create({
   },
   innerTabContainer: {
     flexDirection: 'row',
-    backgroundColor: '#f1f5f9',
+    backgroundColor: isDark ? '#1e293b' : '#f1f5f9',
     borderRadius: 10,
     padding: 4,
     marginBottom: 14,
+    borderWidth: isDark ? 1 : 0,
+    borderColor: COLORS.border,
   },
   innerTabButton: {
     flex: 1,
@@ -896,11 +922,11 @@ const styles = StyleSheet.create({
     fontWeight: '700',
   },
   innerTreatmentList: {
-    backgroundColor: '#fafbfc',
+    backgroundColor: isDark ? '#1e293b' : '#fafbfc',
     borderRadius: 12,
     padding: 12,
     borderWidth: 1,
-    borderColor: '#f1f5f9',
+    borderColor: isDark ? '#334155' : '#f1f5f9',
   },
   treatmentItem: {
     flexDirection: 'row',
@@ -1039,3 +1065,4 @@ const styles = StyleSheet.create({
     lineHeight: 20,
   },
 });
+}

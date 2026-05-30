@@ -12,6 +12,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
+import { useAppTheme } from '../../hooks/useAppTheme';
 import { useFocusEffect } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 import { dotnetClient } from '../../api/client';
@@ -20,7 +21,7 @@ import { API_ROUTES } from '../../constants/api-routes';
 
 const { width } = Dimensions.get('window');
 
-const COLORS = {
+const LIGHT_COLORS = {
   emerald: '#10b981',
   emeraldLight: '#dcfce7',
   slate: '#0f172a',
@@ -31,6 +32,20 @@ const COLORS = {
   danger: '#ef4444',
   dangerLight: '#fee2e2',
 };
+
+const DARK_COLORS = {
+  emerald: '#10b981',
+  emeraldLight: '#064e3b',
+  slate: '#f8fafc',
+  slateLight: '#94a3b8',
+  background: '#0f172a',
+  white: '#1e293b',
+  border: '#334155',
+  danger: '#f87171',
+  dangerLight: '#7f1d1d',
+};
+
+const COLORS = LIGHT_COLORS;
 
 const generateUniqueId = () => {
   return Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15);
@@ -49,6 +64,10 @@ interface ChatSession {
 
 export default function ChatsScreen() {
   const router = useRouter();
+  const { isDark } = useAppTheme();
+  const COLORS = isDark ? DARK_COLORS : LIGHT_COLORS;
+  const styles = getStyles(COLORS);
+
   const [sessions, setSessions] = useState<ChatSession[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
@@ -248,11 +267,12 @@ export default function ChatsScreen() {
   );
 }
 
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: COLORS.background,
-  },
+function getStyles(COLORS: typeof LIGHT_COLORS) {
+  return StyleSheet.create({
+    container: {
+      flex: 1,
+      backgroundColor: COLORS.background,
+    },
   header: {
     flexDirection: 'row',
     justifyContent: 'space-between',
@@ -438,3 +458,4 @@ const styles = StyleSheet.create({
     fontSize: 14,
   },
 });
+}

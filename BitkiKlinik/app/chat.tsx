@@ -13,13 +13,14 @@ import {
   Keyboard
 } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useAppTheme } from '../hooks/useAppTheme';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { dotnetClient } from '../api/client';
 import { API_ROUTES } from '../constants/api-routes';
 
-// Renk Teması
-const COLORS = {
+// Premium Light & Dark Color Palettes
+const LIGHT_COLORS = {
   emerald: '#10b981',
   slate: '#0f172a',
   slateLight: '#64748b',
@@ -30,6 +31,19 @@ const COLORS = {
   textUser: '#ffffff',
   textModel: '#1e293b',
   border: '#e2e8f0',
+};
+
+const DARK_COLORS = {
+  emerald: '#10b981',
+  slate: '#f8fafc',
+  slateLight: '#94a3b8',
+  background: '#0f172a',
+  white: '#1e293b',
+  bubbleUser: '#10b981',
+  bubbleModel: '#334155',
+  textUser: '#ffffff',
+  textModel: '#f8fafc',
+  border: '#334155',
 };
 
 interface Message {
@@ -76,6 +90,9 @@ const renderFormattedText = (text: string) => {
 
 export default function ChatScreen() {
   const insets = useSafeAreaInsets();
+  const { isDark } = useAppTheme();
+  const colors = isDark ? DARK_COLORS : LIGHT_COLORS;
+  const styles = getStyles(colors);
   const params = useLocalSearchParams();
   const router = useRouter();
   const scanId = params.scanId as string | undefined;
@@ -209,7 +226,7 @@ export default function ChatScreen() {
       <View style={[styles.messageRow, isUser ? styles.rowUser : styles.rowModel]}>
         {!isUser && (
           <View style={styles.avatarContainer}>
-            <Ionicons name="leaf" size={16} color={COLORS.white} />
+            <Ionicons name="leaf" size={16} color={colors.white} />
           </View>
         )}
         <View style={[
@@ -230,12 +247,12 @@ export default function ChatScreen() {
 
   return (
     <SafeAreaView style={styles.container}>
-      <StatusBar barStyle="dark-content" />
+      <StatusBar barStyle={isDark ? 'light-content' : 'dark-content'} />
       
       {/* Header */}
       <View style={styles.header}>
         <TouchableOpacity style={styles.backButton} onPress={() => router.back()}>
-          <Ionicons name="arrow-back" size={24} color={COLORS.slate} />
+          <Ionicons name="arrow-back" size={24} color={colors.slate} />
         </TouchableOpacity>
         <View style={styles.headerTitleContainer}>
           <Text style={styles.headerTitle}>Yapay Zeka Hekimi</Text>
@@ -243,9 +260,9 @@ export default function ChatScreen() {
             {scanId ? "Teşhis & Tedavi Asistanı" : "Botanisyen & Ziraat Mühendisi"}
           </Text>
         </View>
-        <View style={styles.statusIndicator}>
+        <View style={[styles.statusIndicator, isDark && { backgroundColor: '#064e3b' }]}>
           <View style={styles.greenDot} />
-          <Text style={styles.statusText}>Aktif</Text>
+          <Text style={[styles.statusText, isDark && { color: '#10b981' }]}>Aktif</Text>
         </View>
       </View>
 
@@ -269,7 +286,7 @@ export default function ChatScreen() {
         {isLoading && (
           <View style={styles.loadingContainer}>
             <View style={styles.loadingBubble}>
-              <ActivityIndicator size="small" color={COLORS.emerald} />
+              <ActivityIndicator size="small" color={colors.emerald} />
               <Text style={styles.loadingText}>Yapay Zeka Hekimi yazıyor...</Text>
             </View>
           </View>
@@ -282,7 +299,7 @@ export default function ChatScreen() {
             value={inputText}
             onChangeText={setInputText}
             placeholder="Sorunuzu yazın..."
-            placeholderTextColor={COLORS.slateLight}
+            placeholderTextColor={colors.slateLight}
             multiline
             maxLength={1000}
           />
@@ -291,7 +308,7 @@ export default function ChatScreen() {
             onPress={handleSend}
             disabled={inputText.trim() === '' || isLoading}
           >
-            <Ionicons name="send" size={18} color={COLORS.white} />
+            <Ionicons name="send" size={18} color={colors.white} />
           </TouchableOpacity>
         </View>
       </KeyboardAvoidingView>
@@ -299,19 +316,19 @@ export default function ChatScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const getStyles = (colors: typeof LIGHT_COLORS) => StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: COLORS.background,
+    backgroundColor: colors.background,
   },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
     paddingHorizontal: 16,
     paddingVertical: 14,
-    backgroundColor: COLORS.white,
+    backgroundColor: colors.white,
     borderBottomWidth: 1,
-    borderBottomColor: COLORS.border,
+    borderBottomColor: colors.border,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.05,
@@ -328,11 +345,11 @@ const styles = StyleSheet.create({
   headerTitle: {
     fontSize: 18,
     fontWeight: 'bold',
-    color: COLORS.slate,
+    color: colors.slate,
   },
   headerSubtitle: {
     fontSize: 12,
-    color: COLORS.slateLight,
+    color: colors.slateLight,
     marginTop: 2,
     fontWeight: '500',
   },
@@ -378,7 +395,7 @@ const styles = StyleSheet.create({
     width: 28,
     height: 28,
     borderRadius: 14,
-    backgroundColor: COLORS.emerald,
+    backgroundColor: colors.emerald,
     justifyContent: 'center',
     alignItems: 'center',
     marginRight: 8,
@@ -390,26 +407,26 @@ const styles = StyleSheet.create({
     borderRadius: 18,
   },
   bubbleUser: {
-    backgroundColor: COLORS.bubbleUser,
+    backgroundColor: colors.bubbleUser,
     borderBottomRightRadius: 4,
   },
   bubbleModel: {
-    backgroundColor: COLORS.bubbleModel,
+    backgroundColor: colors.bubbleModel,
     borderBottomLeftRadius: 4,
   },
   bubbleModelBorder: {
     borderWidth: 1,
-    borderColor: '#e2e8f0',
+    borderColor: colors.border,
   },
   messageText: {
     fontSize: 15,
     lineHeight: 21,
   },
   textUser: {
-    color: COLORS.textUser,
+    color: colors.textUser,
   },
   textModel: {
-    color: COLORS.textModel,
+    color: colors.textModel,
   },
   timeText: {
     fontSize: 9,
@@ -420,7 +437,7 @@ const styles = StyleSheet.create({
     color: 'rgba(255, 255, 255, 0.7)',
   },
   timeModel: {
-    color: COLORS.slateLight,
+    color: colors.slateLight,
   },
   loadingContainer: {
     paddingHorizontal: 16,
@@ -430,17 +447,17 @@ const styles = StyleSheet.create({
   loadingBubble: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: COLORS.white,
+    backgroundColor: colors.white,
     paddingHorizontal: 16,
     paddingVertical: 10,
     borderRadius: 18,
     borderBottomLeftRadius: 4,
     borderWidth: 1,
-    borderColor: COLORS.border,
+    borderColor: colors.border,
   },
   loadingText: {
     fontSize: 13,
-    color: COLORS.slateLight,
+    color: colors.slateLight,
     marginLeft: 8,
     fontWeight: '500',
   },
@@ -448,29 +465,29 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     paddingHorizontal: 16,
     paddingVertical: 10,
-    backgroundColor: COLORS.white,
+    backgroundColor: colors.white,
     borderTopWidth: 1,
-    borderTopColor: COLORS.border,
+    borderTopColor: colors.border,
     alignItems: 'center',
   },
   input: {
     flex: 1,
-    backgroundColor: COLORS.background,
+    backgroundColor: colors.background,
     borderRadius: 20,
     paddingHorizontal: 16,
     paddingVertical: 8,
     marginRight: 10,
     maxHeight: 100,
     fontSize: 15,
-    color: COLORS.slate,
+    color: colors.slate,
     borderWidth: 1,
-    borderColor: COLORS.border,
+    borderColor: colors.border,
   },
   sendButton: {
     width: 40,
     height: 40,
     borderRadius: 20,
-    backgroundColor: COLORS.emerald,
+    backgroundColor: colors.emerald,
     justifyContent: 'center',
     alignItems: 'center',
   },

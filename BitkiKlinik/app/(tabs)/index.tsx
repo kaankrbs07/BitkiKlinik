@@ -30,6 +30,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useAuthStore } from '../../store/useAuthStore';
 import { useDashboardData, RecentScan } from '../../hooks/useDashboardData';
 import { useProfile } from '../../hooks/useProfile';
+import { useAppTheme } from '../../hooks/useAppTheme';
 import { CONFIG } from '../../constants/config';
 import { CARE_TIPS } from '../../constants/care-data';
 import { API_ROUTES } from '../../constants/api-routes';
@@ -66,8 +67,8 @@ interface RiskAlert {
   calculatedAt: string;
 }
 
-// Premium Color Palette
-const COLORS = {
+// Premium Light & Dark Color Palettes
+const LIGHT_COLORS = {
   emerald: '#10b981',
   emeraldLight: '#dcfce7',
   slate: '#0f172a',
@@ -77,7 +78,25 @@ const COLORS = {
   warning: '#ffb703',
   danger: '#ef4444',
   dangerLight: '#fee2e2',
+  inputBg: '#f1f5f9',
+  border: '#e2e8f0',
 };
+
+const DARK_COLORS = {
+  emerald: '#10b981',
+  emeraldLight: '#064e3b',
+  slate: '#f8fafc',
+  slateLight: '#94a3b8',
+  background: '#0f172a',
+  white: '#1e293b',
+  warning: '#fbbf24',
+  danger: '#f87171',
+  dangerLight: '#7f1d1d',
+  inputBg: '#334155',
+  border: '#334155',
+};
+
+const COLORS = LIGHT_COLORS;
 
 
 
@@ -108,6 +127,10 @@ interface HeaderSectionProps {
 }
 
 function HeaderSection({ username, profilePictureUrl, onAvatarPress, onLogoutPress }: HeaderSectionProps) {
+  const { isDark } = useAppTheme();
+  const COLORS = isDark ? DARK_COLORS : LIGHT_COLORS;
+  const styles = getStyles(COLORS);
+
   const hasPhoto = !!profilePictureUrl;
   const avatarUri = profilePictureUrl
     ? (profilePictureUrl.startsWith('http') ? profilePictureUrl : `${CONFIG.DOTNET_BASE_URL}${profilePictureUrl}`)
@@ -152,6 +175,10 @@ interface AdminBannerSectionProps {
 }
 
 function AdminBannerSection({ isAdmin, onPress }: AdminBannerSectionProps) {
+  const { isDark } = useAppTheme();
+  const COLORS = isDark ? DARK_COLORS : LIGHT_COLORS;
+  const styles = getStyles(COLORS);
+
   if (!isAdmin) return null;
 
   return (
@@ -181,10 +208,14 @@ interface StatsSectionProps {
 }
 
 function StatsSection({ stats }: StatsSectionProps) {
+  const { isDark } = useAppTheme();
+  const COLORS = isDark ? DARK_COLORS : LIGHT_COLORS;
+  const styles = getStyles(COLORS);
+
   return (
     <Animated.View entering={FadeInDown.delay(200).duration(800)} style={styles.statsContainer}>
-      <View style={styles.statCard}>
-        <Text style={styles.statValue}>{stats.total}</Text>
+      <View style={[styles.statCard, { backgroundColor: isDark ? COLORS.white : COLORS.slate }]}>
+        <Text style={[styles.statValue, { color: isDark ? COLORS.slate : COLORS.white }]}>{stats.total}</Text>
         <Text style={styles.statLabel}>Toplam</Text>
       </View>
       <View style={[styles.statCard, { backgroundColor: COLORS.white }]}>
@@ -207,6 +238,10 @@ interface MainActionSectionProps {
 }
 
 function MainActionSection({ onPress }: MainActionSectionProps) {
+  const { isDark } = useAppTheme();
+  const COLORS = isDark ? DARK_COLORS : LIGHT_COLORS;
+  const styles = getStyles(COLORS);
+
   return (
     <Animated.View entering={FadeInDown.delay(400).duration(800)}>
       <TouchableOpacity 
@@ -236,6 +271,10 @@ function MainActionSection({ onPress }: MainActionSectionProps) {
 // 5. TIPS SECTION COMPONENT
 // ============================================================================
 function TipsSection() {
+  const { isDark } = useAppTheme();
+  const COLORS = isDark ? DARK_COLORS : LIGHT_COLORS;
+  const styles = getStyles(COLORS);
+
   return (
     <View>
       <View style={styles.sectionHeader}>
@@ -278,6 +317,10 @@ interface HistorySectionProps {
 }
 
 function HistorySection({ recentScans, isLoading, error, onRefresh, onSeeAllPress }: HistorySectionProps) {
+  const { isDark } = useAppTheme();
+  const COLORS = isDark ? DARK_COLORS : LIGHT_COLORS;
+  const styles = getStyles(COLORS);
+
   return (
     <View>
       <View style={styles.sectionHeader}>
@@ -361,6 +404,10 @@ interface AIChatHistorySectionProps {
 }
 
 function AIChatHistorySection({ sessions, isLoading, onSeeAllPress, onSessionPress }: AIChatHistorySectionProps) {
+  const { isDark } = useAppTheme();
+  const COLORS = isDark ? DARK_COLORS : LIGHT_COLORS;
+  const styles = getStyles(COLORS);
+
   if (!isLoading && sessions.length === 0) return null; // Sohbet yoksa gösterme
 
   return (
@@ -430,13 +477,65 @@ interface WeatherDiseaseRiskSectionProps {
 }
 
 function WeatherDiseaseRiskSection({ riskAlert, isLoading, locationGranted, onRequestLocation }: WeatherDiseaseRiskSectionProps) {
+  const { isDark } = useAppTheme();
+  const COLORS = isDark ? DARK_COLORS : LIGHT_COLORS;
+  const styles = getStyles(COLORS);
+
+  const getRiskColor = (level: string) => {
+    switch (level) {
+      case 'Kritik': return COLORS.danger;
+      case 'Orta': return COLORS.warning;
+      default: return COLORS.emerald;
+    }
+  };
+
+  const getRiskBg = (level: string) => {
+    if (isDark) {
+      switch (level) {
+        case 'Kritik': return '#7f1d1d40';
+        case 'Orta': return '#fbbf2415';
+        default: return '#064e3b40';
+      }
+    } else {
+      switch (level) {
+        case 'Kritik': return '#fef2f2';
+        case 'Orta': return '#fffbeb';
+        default: return '#f0fdf4';
+      }
+    }
+  };
+
+  const getRiskBorder = (level: string) => {
+    if (isDark) {
+      switch (level) {
+        case 'Kritik': return '#7f1d1d80';
+        case 'Orta': return '#fbbf2440';
+        default: return '#064e3b80';
+      }
+    } else {
+      switch (level) {
+        case 'Kritik': return '#fee2e2';
+        case 'Orta': return '#fef3c7';
+        default: return '#dcfce7';
+      }
+    }
+  };
+
+  const getRiskIcon = (level: string) => {
+    switch (level) {
+      case 'Kritik': return 'alert-circle';
+      case 'Orta': return 'warning';
+      default: return 'shield-checkmark';
+    }
+  };
+
   if (locationGranted === false) {
     return (
       <Animated.View entering={FadeInDown.delay(300).duration(800)} style={styles.riskCardContainer}>
-        <View style={[styles.riskCard, { backgroundColor: '#fffbeb', borderColor: '#fef3c7', borderWidth: 1 }]}>
+        <View style={[styles.riskCard, { backgroundColor: isDark ? '#fbbf2415' : '#fffbeb', borderColor: isDark ? '#fbbf2430' : '#fef3c7', borderWidth: 1 }]}>
           <View style={styles.riskHeader}>
-            <View style={[styles.riskIconBg, { backgroundColor: 'rgba(217, 119, 6, 0.1)' }]}>
-              <Ionicons name="location-outline" size={24} color="#d97706" />
+            <View style={[styles.riskIconBg, { backgroundColor: isDark ? '#fbbf2430' : 'rgba(217, 119, 6, 0.1)' }]}>
+              <Ionicons name="location-outline" size={24} color={isDark ? COLORS.warning : "#d97706"} />
             </View>
             <View style={{ flex: 1, marginLeft: 12 }}>
               <Text style={[styles.riskTitle, { color: COLORS.slate }]}>Konum Bazlı Tahmin</Text>
@@ -466,38 +565,6 @@ function WeatherDiseaseRiskSection({ riskAlert, isLoading, locationGranted, onRe
   }
 
   if (!riskAlert) return null;
-
-  const getRiskColor = (level: string) => {
-    switch (level) {
-      case 'Kritik': return COLORS.danger;
-      case 'Orta': return COLORS.warning;
-      default: return COLORS.emerald;
-    }
-  };
-
-  const getRiskBg = (level: string) => {
-    switch (level) {
-      case 'Kritik': return '#fef2f2';
-      case 'Orta': return '#fffbeb';
-      default: return '#f0fdf4';
-    }
-  };
-
-  const getRiskBorder = (level: string) => {
-    switch (level) {
-      case 'Kritik': return '#fee2e2';
-      case 'Orta': return '#fef3c7';
-      default: return '#dcfce7';
-    }
-  };
-
-  const getRiskIcon = (level: string) => {
-    switch (level) {
-      case 'Kritik': return 'alert-circle';
-      case 'Orta': return 'warning';
-      default: return 'shield-checkmark';
-    }
-  };
 
   const riskColor = getRiskColor(riskAlert.riskLevel);
   const cardBg = getRiskBg(riskAlert.riskLevel);
@@ -606,6 +673,10 @@ async function checkAndShowLocalRiskNotification(alert: any) {
 // ============================================================================
 export default function HomeScreen() {
   const router = useRouter();
+  const { theme, resolvedTheme, isDark } = useAppTheme();
+  const COLORS = isDark ? DARK_COLORS : LIGHT_COLORS;
+  const styles = getStyles(COLORS);
+
   const { logout, isAdmin, username, profilePictureUrl, isAuthenticated } = useAuthStore();
   const { stats, recentScans, isLoading, error, refresh } = useDashboardData();
   const { fetchProfile } = useProfile();
@@ -800,7 +871,7 @@ export default function HomeScreen() {
 
   return (
     <View style={styles.container}>
-      <StatusBar barStyle="dark-content" />
+      <StatusBar barStyle={isDark ? "light-content" : "dark-content"} />
 
       {/* Premium Onboarding / Konum İzni Açıklama Modalı */}
       <Modal
@@ -937,11 +1008,12 @@ export default function HomeScreen() {
   );
 }
 
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: COLORS.background,
-  },
+function getStyles(COLORS: typeof LIGHT_COLORS) {
+  return StyleSheet.create({
+    container: {
+      flex: 1,
+      backgroundColor: COLORS.background,
+    },
   scrollContent: {
     paddingBottom: 40,
   },
@@ -1504,3 +1576,4 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
 });
+}

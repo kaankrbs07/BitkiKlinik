@@ -13,28 +13,47 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
+import { useAppTheme } from '../../hooks/useAppTheme';
 import Animated, { FadeInDown, LinearTransition } from 'react-native-reanimated';
 import { dotnetClient } from '../../api/client';
 
 const { width } = Dimensions.get('window');
 
-// ─── Renk Paleti (MLOps Slate & Electric Blue) ──────────────────────
-const C = {
-  primary: '#3b82f6',         // Electric Blue
+// Premium Light & Dark Color Palettes
+const LIGHT_COLORS = {
+  primary: '#3b82f6',
   primaryLight: '#eff6ff',
-  indigo: '#6366f1',          // Train Acc Color
+  indigo: '#6366f1',
   indigoLight: '#eef2ff',
-  emerald: '#10b981',         // Val Acc / Healthy (Success)
+  emerald: '#10b981',
   emeraldLight: '#dcfce7',
-  rose: '#f43f5e',            // Loss / Hatalı (Kırmızı)
+  rose: '#f43f5e',
   roseLight: '#ffe4e6',
-  amber: '#f59e0b',           // Warning (Sarı)
+  amber: '#f59e0b',
   amberLight: '#fef3c7',
-  slate: '#0f172a',           // Dark text
-  slateLight: '#64748b',      // Subtitle
-  bg: '#f8fafc',              // Background
+  slate: '#0f172a',
+  slateLight: '#64748b',
+  bg: '#f8fafc',
   white: '#ffffff',
   border: '#e2e8f0',
+};
+
+const DARK_COLORS = {
+  primary: '#3b82f6',
+  primaryLight: '#1e3a8a',
+  indigo: '#6366f1',
+  indigoLight: '#312e81',
+  emerald: '#10b981',
+  emeraldLight: '#064e3b',
+  rose: '#f43f5e',
+  roseLight: '#881337',
+  amber: '#f59e0b',
+  amberLight: '#78350f',
+  slate: '#f8fafc',
+  slateLight: '#94a3b8',
+  bg: '#0f172a',
+  white: '#1e293b',
+  border: '#334155',
 };
 
 interface RetrainHistoryItem {
@@ -55,6 +74,9 @@ interface ClassDistributionItem {
 }
 
 export default function MLOpsDashboardScreen() {
+  const { isDark } = useAppTheme();
+  const colors = isDark ? DARK_COLORS : LIGHT_COLORS;
+  const s = getStyles(colors);
   const router = useRouter();
 
   // ─── State Tanımları ────────────────────────────────────────────────
@@ -128,13 +150,13 @@ export default function MLOpsDashboardScreen() {
 
   return (
     <View style={s.container}>
-      <StatusBar barStyle="dark-content" />
+      <StatusBar barStyle={isDark ? 'light-content' : 'dark-content'} />
       <SafeAreaView style={{ flex: 1 }}>
 
         {/* Header */}
         <View style={s.header}>
           <TouchableOpacity onPress={() => router.back()} style={s.backBtn}>
-            <Ionicons name="arrow-back" size={22} color={C.slate} />
+            <Ionicons name="arrow-back" size={22} color={colors.slate} />
           </TouchableOpacity>
           <View style={{ flex: 1 }}>
             <Text style={s.headerTitle}>MLOps & Performans 📊</Text>
@@ -142,9 +164,9 @@ export default function MLOpsDashboardScreen() {
           </View>
           <TouchableOpacity style={s.refreshBtn} onPress={fetchData} disabled={isLoading}>
             {isLoading ? (
-              <ActivityIndicator size="small" color={C.primary} />
+              <ActivityIndicator size="small" color={colors.primary} />
             ) : (
-              <Ionicons name="refresh" size={20} color={C.slate} />
+              <Ionicons name="refresh" size={20} color={colors.slate} />
             )}
           </TouchableOpacity>
         </View>
@@ -153,12 +175,12 @@ export default function MLOpsDashboardScreen() {
           contentContainerStyle={s.scrollContent}
           showsVerticalScrollIndicator={false}
           refreshControl={
-            <RefreshControl refreshing={isLoading} onRefresh={fetchData} tintColor={C.primary} />
+            <RefreshControl refreshing={isLoading} onRefresh={fetchData} tintColor={colors.primary} />
           }
         >
           {error && (
             <Animated.View entering={FadeInDown.duration(400)} style={s.errCard}>
-              <Ionicons name="alert-circle" size={24} color={C.rose} />
+              <Ionicons name="alert-circle" size={24} color={colors.rose} />
               <View style={{ flex: 1 }}>
                 <Text style={s.errTitle}>Veri Hatası</Text>
                 <Text style={s.errTxt}>{error}</Text>
@@ -168,7 +190,7 @@ export default function MLOpsDashboardScreen() {
 
           {isLoading && history.length === 0 ? (
             <View style={s.loaderContainer}>
-              <ActivityIndicator size="large" color={C.primary} />
+              <ActivityIndicator size="large" color={colors.primary} />
               <Text style={s.loaderText}>MLOps verileri yükleniyor...</Text>
             </View>
           ) : (
@@ -220,9 +242,9 @@ export default function MLOpsDashboardScreen() {
                             >
                               <View style={s.barPair}>
                                 {/* Train Acc */}
-                                <View style={[s.barSub, { height: getBarHeight(run.trainAcc) as any, backgroundColor: C.indigo }]} />
+                                <View style={[s.barSub, { height: getBarHeight(run.trainAcc) as any, backgroundColor: colors.indigo }]} />
                                 {/* Val Acc */}
-                                <View style={[s.barSub, { height: getBarHeight(run.valAcc) as any, backgroundColor: C.emerald }]} />
+                                <View style={[s.barSub, { height: getBarHeight(run.valAcc) as any, backgroundColor: colors.emerald }]} />
                               </View>
                               <Text style={[s.xAxisText, isSelected && s.xAxisTextSelected]}>
                                 {formatDate(run.trainedAt, true)}
@@ -242,11 +264,11 @@ export default function MLOpsDashboardScreen() {
                   {/* Çizelge Açıklama/Legend */}
                   <View style={s.legend}>
                     <View style={s.legendItem}>
-                      <View style={[s.legendColor, { backgroundColor: C.indigo }]} />
+                      <View style={[s.legendColor, { backgroundColor: colors.indigo }]} />
                       <Text style={s.legendText}>Eğitim Doğruluğu</Text>
                     </View>
                     <View style={s.legendItem}>
-                      <View style={[s.legendColor, { backgroundColor: C.emerald }]} />
+                      <View style={[s.legendColor, { backgroundColor: colors.emerald }]} />
                       <Text style={s.legendText}>Validasyon Doğruluğu</Text>
                     </View>
                   </View>
@@ -262,13 +284,13 @@ export default function MLOpsDashboardScreen() {
                   </View>
 
                   <View style={s.metricsRow}>
-                    <View style={[s.metricItem, { borderLeftColor: C.indigo }]}>
+                    <View style={[s.metricItem, { borderLeftColor: colors.indigo }]}>
                       <Text style={s.metricVal}>%{(selectedRun.trainAcc * 100).toFixed(1)}</Text>
                       <Text style={s.metricLabel}>Train Acc</Text>
                       <Text style={s.metricSub}>Kayıp: {selectedRun.trainLoss.toFixed(4)}</Text>
                     </View>
 
-                    <View style={[s.metricItem, { borderLeftColor: C.emerald }]}>
+                    <View style={[s.metricItem, { borderLeftColor: colors.emerald }]}>
                       <Text style={s.metricVal}>%{(selectedRun.valAcc * 100).toFixed(1)}</Text>
                       <Text style={s.metricLabel}>Validation Acc</Text>
                       <Text style={s.metricSub}>Kayıp: {selectedRun.valLoss.toFixed(4)}</Text>
@@ -303,7 +325,7 @@ export default function MLOpsDashboardScreen() {
 
                 {distribution.length === 0 ? (
                   <View style={s.emptyDist}>
-                    <Ionicons name="albums-outline" size={40} color={C.slateLight} />
+                    <Ionicons name="albums-outline" size={40} color={colors.slateLight} />
                     <Text style={s.emptyDistTxt}>Henüz admin tarafından çözülüp veri setine eklenen onaylı aktif öğrenme görseli bulunmuyor.</Text>
                   </View>
                 ) : (
@@ -315,10 +337,10 @@ export default function MLOpsDashboardScreen() {
                         
                         // Sıralamaya göre renk ataması
                         const getBarColor = (index: number) => {
-                          if (index === 0) return '#6366f1'; // Indigo (En Çok)
-                          if (index === 1) return '#3b82f6'; // Blue
-                          if (index === 2) return '#10b981'; // Emerald
-                          return C.slateLight;
+                          if (index === 0) return '#6366f1'; 
+                          if (index === 1) return '#3b82f6'; 
+                          if (index === 2) return '#10b981'; 
+                          return colors.slateLight;
                         };
 
                         return (
@@ -355,8 +377,8 @@ export default function MLOpsDashboardScreen() {
   );
 }
 
-const s = StyleSheet.create({
-  container: { flex: 1, backgroundColor: C.bg },
+const getStyles = (colors: typeof LIGHT_COLORS) => StyleSheet.create({
+  container: { flex: 1, backgroundColor: colors.bg },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -369,7 +391,7 @@ const s = StyleSheet.create({
     width: 40,
     height: 40,
     borderRadius: 12,
-    backgroundColor: C.white,
+    backgroundColor: colors.white,
     justifyContent: 'center',
     alignItems: 'center',
     shadowColor: '#000',
@@ -378,13 +400,13 @@ const s = StyleSheet.create({
     shadowRadius: 4,
     elevation: 2,
   },
-  headerTitle: { fontSize: 20, fontWeight: 'bold', color: C.slate },
-  headerSubtitle: { fontSize: 11, color: C.slateLight, marginTop: 2 },
+  headerTitle: { fontSize: 20, fontWeight: 'bold', color: colors.slate },
+  headerSubtitle: { fontSize: 11, color: colors.slateLight, marginTop: 2 },
   refreshBtn: {
     width: 40,
     height: 40,
     borderRadius: 12,
-    backgroundColor: C.white,
+    backgroundColor: colors.white,
     justifyContent: 'center',
     alignItems: 'center',
     shadowColor: '#000',
@@ -400,7 +422,7 @@ const s = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'flex-start',
     gap: 12,
-    backgroundColor: C.roseLight,
+    backgroundColor: colors.roseLight,
     marginHorizontal: 20,
     padding: 16,
     borderRadius: 16,
@@ -408,15 +430,15 @@ const s = StyleSheet.create({
     borderWidth: 1,
     borderColor: '#fca5a5',
   },
-  errTitle: { color: C.rose, fontSize: 15, fontWeight: 'bold', marginBottom: 2 },
+  errTitle: { color: colors.rose, fontSize: 15, fontWeight: 'bold', marginBottom: 2 },
   errTxt: { color: '#be123c', fontSize: 13, lineHeight: 18 },
 
   loaderContainer: { alignItems: 'center', justifyContent: 'center', paddingVertical: 120 },
-  loaderText: { fontSize: 14, color: C.slateLight, marginTop: 12 },
+  loaderText: { fontSize: 14, color: colors.slateLight, marginTop: 12 },
 
   // Doğruluk Çizelge Kartı
   chartCard: {
-    backgroundColor: C.white,
+    backgroundColor: colors.white,
     borderRadius: 24,
     padding: 20,
     marginHorizontal: 20,
@@ -427,7 +449,7 @@ const s = StyleSheet.create({
     shadowRadius: 8,
     elevation: 2,
   },
-  chartCardTitle: { fontSize: 15, fontWeight: 'bold', color: C.slate, marginBottom: 16 },
+  chartCardTitle: { fontSize: 15, fontWeight: 'bold', color: colors.slate, marginBottom: 16 },
   chartContainer: {
     height: 240,
     flexDirection: 'row',
@@ -441,7 +463,7 @@ const s = StyleSheet.create({
     alignItems: 'flex-end',
     width: 32,
   },
-  yAxisText: { fontSize: 10, color: C.slateLight, fontWeight: '600' },
+  yAxisText: { fontSize: 10, color: colors.slateLight, fontWeight: '600' },
   chartScrollView: {
     flex: 1,
     height: 240,
@@ -455,7 +477,7 @@ const s = StyleSheet.create({
     alignItems: 'flex-end',
     borderLeftWidth: 1,
     borderBottomWidth: 1,
-    borderColor: C.border,
+    borderColor: colors.border,
     position: 'relative',
     gap: 12,
     paddingHorizontal: 8,
@@ -484,8 +506,8 @@ const s = StyleSheet.create({
     position: 'relative',
   },
   barColumnSelected: {
-    borderColor: C.primary,
-    backgroundColor: C.primaryLight,
+    borderColor: colors.primary,
+    backgroundColor: colors.primaryLight,
   },
   barPair: {
     height: '100%',
@@ -501,12 +523,12 @@ const s = StyleSheet.create({
   },
   xAxisText: {
     fontSize: 9,
-    color: C.slateLight,
+    color: colors.slateLight,
     fontWeight: '700',
     position: 'absolute',
     bottom: -22,
   },
-  xAxisTextSelected: { color: C.primary, fontWeight: '800' },
+  xAxisTextSelected: { color: colors.primary, fontWeight: '800' },
   xAxisRightLabel: {
     width: 40,
     height: 200,
@@ -517,7 +539,7 @@ const s = StyleSheet.create({
   },
   xAxisRightLabelText: {
     fontSize: 10,
-    color: C.slateLight,
+    color: colors.slateLight,
     fontWeight: 'bold',
     position: 'absolute',
     bottom: -22,
@@ -529,16 +551,16 @@ const s = StyleSheet.create({
     gap: 16,
     marginTop: 8,
     borderTopWidth: 1,
-    borderTopColor: C.border,
+    borderTopColor: colors.border,
     paddingTop: 12,
   },
   legendItem: { flexDirection: 'row', alignItems: 'center', gap: 6 },
   legendColor: { width: 10, height: 10, borderRadius: 3 },
-  legendText: { fontSize: 11, color: C.slateLight, fontWeight: '600' },
+  legendText: { fontSize: 11, color: colors.slateLight, fontWeight: '600' },
 
   // Koşu Detay Kartı
   runDetailsCard: {
-    backgroundColor: C.white,
+    backgroundColor: colors.white,
     borderRadius: 24,
     padding: 20,
     marginHorizontal: 20,
@@ -554,12 +576,12 @@ const s = StyleSheet.create({
     justifyContent: 'space-between',
     alignItems: 'center',
     borderBottomWidth: 1,
-    borderBottomColor: C.border,
+    borderBottomColor: colors.border,
     paddingBottom: 12,
     marginBottom: 16,
   },
-  runDetailsTitle: { fontSize: 15, fontWeight: 'bold', color: C.slate },
-  runDetailsDate: { fontSize: 12, color: C.slateLight, fontWeight: '600' },
+  runDetailsTitle: { fontSize: 15, fontWeight: 'bold', color: colors.slate },
+  runDetailsDate: { fontSize: 12, color: colors.slateLight, fontWeight: '600' },
   metricsRow: { flexDirection: 'row', gap: 12, marginBottom: 16 },
   metricItem: {
     flex: 1,
@@ -567,9 +589,9 @@ const s = StyleSheet.create({
     paddingLeft: 12,
     paddingVertical: 4,
   },
-  metricVal: { fontSize: 22, fontWeight: 'black', color: C.slate },
-  metricLabel: { fontSize: 12, fontWeight: 'bold', color: C.slate, marginTop: 2 },
-  metricSub: { fontSize: 11, color: C.slateLight, marginTop: 1 },
+  metricVal: { fontSize: 22, fontWeight: 'black', color: colors.slate },
+  metricLabel: { fontSize: 12, fontWeight: 'bold', color: colors.slate, marginTop: 2 },
+  metricSub: { fontSize: 11, color: colors.slateLight, marginTop: 1 },
 
   runSamplesBox: {
     flexDirection: 'row',
@@ -579,16 +601,16 @@ const s = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-around',
     borderWidth: 1,
-    borderColor: C.border,
+    borderColor: colors.border,
   },
   sampleBoxItem: { alignItems: 'center' },
-  sampleBoxNum: { fontSize: 16, fontWeight: 'bold', color: C.slate },
-  sampleBoxLabel: { fontSize: 10, color: C.slateLight, fontWeight: '700', marginTop: 2 },
-  sampleBoxDivider: { width: 1, height: 24, backgroundColor: C.border },
+  sampleBoxNum: { fontSize: 16, fontWeight: 'bold', color: colors.slate },
+  sampleBoxLabel: { fontSize: 10, color: colors.slateLight, fontWeight: '700', marginTop: 2 },
+  sampleBoxDivider: { width: 1, height: 24, backgroundColor: colors.border },
 
   // Dağılım Kartı
   distributionCard: {
-    backgroundColor: C.white,
+    backgroundColor: colors.white,
     borderRadius: 24,
     padding: 20,
     marginHorizontal: 20,
@@ -600,16 +622,16 @@ const s = StyleSheet.create({
     elevation: 2,
   },
   distributionHeader: { marginBottom: 16 },
-  distributionTitle: { fontSize: 15, fontWeight: 'bold', color: C.slate },
-  distributionSubtitle: { fontSize: 12, color: C.slateLight, marginTop: 4, lineHeight: 18 },
+  distributionTitle: { fontSize: 15, fontWeight: 'bold', color: colors.slate },
+  distributionSubtitle: { fontSize: 12, color: colors.slateLight, marginTop: 4, lineHeight: 18 },
   emptyDist: { alignItems: 'center', paddingVertical: 40, gap: 12 },
-  emptyDistTxt: { fontSize: 13, color: C.slateLight, textAlign: 'center', lineHeight: 20 },
+  emptyDistTxt: { fontSize: 13, color: colors.slateLight, textAlign: 'center', lineHeight: 20 },
   
   distList: { gap: 16 },
   distItem: { gap: 6 },
   distRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-  distClassLabel: { fontSize: 13, fontWeight: 'bold', color: C.slate, flex: 1, marginRight: 12 },
-  distClassCount: { fontSize: 12, color: C.slateLight, fontWeight: '600' },
+  distClassLabel: { fontSize: 13, fontWeight: 'bold', color: colors.slate, flex: 1, marginRight: 12 },
+  distClassCount: { fontSize: 12, color: colors.slateLight, fontWeight: '600' },
   
   progressBarBg: { height: 8, backgroundColor: '#f1f5f9', borderRadius: 4, overflow: 'hidden' },
   progressBarFill: { height: '100%', borderRadius: 4 },
