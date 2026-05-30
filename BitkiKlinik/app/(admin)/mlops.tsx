@@ -220,9 +220,9 @@ export default function MLOpsDashboardScreen() {
                             >
                               <View style={s.barPair}>
                                 {/* Train Acc */}
-                                <View style={[s.barSub, { height: getBarHeight(run.trainAcc), backgroundColor: C.indigo }]} />
+                                <View style={[s.barSub, { height: getBarHeight(run.trainAcc) as any, backgroundColor: C.indigo }]} />
                                 {/* Val Acc */}
-                                <View style={[s.barSub, { height: getBarHeight(run.valAcc), backgroundColor: C.emerald }]} />
+                                <View style={[s.barSub, { height: getBarHeight(run.valAcc) as any, backgroundColor: C.emerald }]} />
                               </View>
                               <Text style={[s.xAxisText, isSelected && s.xAxisTextSelected]}>
                                 {formatDate(run.trainedAt, true)}

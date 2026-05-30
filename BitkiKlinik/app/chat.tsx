@@ -12,7 +12,7 @@ import {
   StatusBar,
   Keyboard
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { dotnetClient } from '../api/client';
@@ -39,7 +39,43 @@ interface Message {
   timestamp: Date;
 }
 
+// Markdown formatındaki (**kalın** ve *italik*) metinleri React Native Text bileşenlerine dönüştürür
+const renderFormattedText = (text: string) => {
+  if (!text) return null;
+  
+  const parts = text.split('**');
+  return parts.map((part, i) => {
+    const isBold = i % 2 === 1;
+    
+    if (isBold) {
+      return (
+        <Text key={i} style={{ fontWeight: 'bold' }}>
+          {part}
+        </Text>
+      );
+    }
+    
+    const italicParts = part.split('*');
+    if (italicParts.length > 1) {
+      return italicParts.map((subPart, j) => {
+        const isItalic = j % 2 === 1;
+        if (isItalic) {
+          return (
+            <Text key={`${i}-${j}`} style={{ fontStyle: 'italic' }}>
+              {subPart}
+            </Text>
+          );
+        }
+        return subPart;
+      });
+    }
+    
+    return part;
+  });
+};
+
 export default function ChatScreen() {
+  const insets = useSafeAreaInsets();
   const params = useLocalSearchParams();
   const router = useRouter();
   const scanId = params.scanId as string | undefined;
@@ -182,7 +218,7 @@ export default function ChatScreen() {
           !isUser && styles.bubbleModelBorder
         ]}>
           <Text style={[styles.messageText, isUser ? styles.textUser : styles.textModel]}>
-            {item.content}
+            {renderFormattedText(item.content)}
           </Text>
           <Text style={[styles.timeText, isUser ? styles.timeUser : styles.timeModel]}>
             {item.timestamp.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
@@ -216,7 +252,7 @@ export default function ChatScreen() {
       <KeyboardAvoidingView
         style={{ flex: 1 }}
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-        keyboardVerticalOffset={Platform.OS === 'ios' ? 90 : 0}
+        keyboardVerticalOffset={Platform.OS === 'ios' ? insets.bottom : 0}
       >
         {/* Mesaj Listesi */}
         <FlatList
