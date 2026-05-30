@@ -4,6 +4,7 @@ using BitkiKlinik.API.Models.Enums;
 using BitkiKlinik.API.Services.Interfaces;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.Extensions.Configuration;
 
 namespace BitkiKlinik.API.Controllers;
 
@@ -18,11 +19,13 @@ public class UsersController : ControllerBase
 {
     private readonly IUserService _userService;
     private readonly IPasswordHasher _passwordHasher;
+    private readonly IConfiguration _configuration;
 
-    public UsersController(IUserService userService, IPasswordHasher passwordHasher)
+    public UsersController(IUserService userService, IPasswordHasher passwordHasher, IConfiguration configuration)
     {
         _userService    = userService;
         _passwordHasher = passwordHasher;
+        _configuration  = configuration;
     }
 
     // ────────────────────────────────────────────────────────────────
@@ -179,17 +182,19 @@ public class UsersController : ControllerBase
                 if (!Enum.TryParse<UserRole>(dto.Role, ignoreCase: true, out var role))
                     return BadRequest(new { Message = $"Geçersiz rol: '{dto.Role}'. Geçerli değerler: User, Admin." });
 
-                // Ana Admin Hesabı (ID = 3) Koruma Mantığı
-                if (id == 3 && role != user.Role)
+                // Super Admin Hesabı Koruma Mantığı
+                var superAdminsStr = _configuration["SuperAdminEmails"] ?? string.Empty;
+                var superAdmins = superAdminsStr.Split(',', StringSplitOptions.RemoveEmptyEntries).Select(e => e.Trim());
+                if (superAdmins.Contains(user.Email) && role != user.Role)
                 {
-                    return BadRequest(new { Message = "Sistem bütünlüğü için ana yönetici (ID: 3) hesabının rolü değiştirilemez." });
+                    return BadRequest(new { Message = "Sistem bütünlüğü için yapılandırmada Super Admin hesaplarının rolü değiştirilemez." });
                 }
 
                 // Kendi rolünü demote etmeyi (User yapmayı) engelle
                 var currentUserId = User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value;
                 if (currentUserId == id.ToString() && role == UserRole.User && user.Role == UserRole.Admin)
                 {
-                    return BadRequest(new { Message = "Kendi yöneticilik (Admin) rolünüzü standart kullanıcıya (User) düşüremezsiniz." });
+                    return BadRequest(new { Message = "Kendi Admin rolünüzü standart kullanıcıya (User) düşüremezsiniz." });
                 }
 
                 user.Role = role;
@@ -229,6 +234,12 @@ public class UsersController : ControllerBase
         var currentUserId = User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value;
         if (currentUserId == id.ToString())
             return BadRequest(new { Message = "Kendi hesabınızı silemezsiniz." });
+
+        // Super Admin hesaplarının silinmesini engelle
+        var superAdminsStr = _configuration["SuperAdminEmails"] ?? string.Empty;
+        var superAdmins = superAdminsStr.Split(',', StringSplitOptions.RemoveEmptyEntries).Select(e => e.Trim());
+        if (superAdmins.Contains(user.Email))
+            return BadRequest(new { Message = "Sistem bütünlüğü için yapılandırmada (.env) tanımlı Super Admin hesapları silinemez/pasife alınamaz." });
 
         await _userService.DeleteAsync(id);
 
