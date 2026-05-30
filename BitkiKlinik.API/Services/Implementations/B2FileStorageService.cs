@@ -77,6 +77,9 @@ public class B2FileStorageService : IFileStorageService
             throw new ArgumentException(
                 $"Desteklenmeyen dosya türü: {extension}. " +
                 $"İzin verilenler: {string.Join(", ", _allowedExtensions)}");
+
+        // Güvenlik: Magic Number doğrulaması (Gerçek dosya içeriği analizi)
+        LocalFileStorageService.ValidateImageSignature(file);
     }
 
     /// <inheritdoc />
