@@ -245,8 +245,8 @@ def predict_tta(image: Image.Image, tta_passes: int = 5) -> tuple[str, float]:
         # Tek bir forward pass ile tüm varyasyonları tahmin et!
         logits = state["model"](batch_tensor)
         
-        # Temperature Scaling (0.4) ve Softmax uygula
-        probs = torch.softmax(logits / 0.4, dim=1)
+        # Temperature Scaling (0.7) ve Softmax uygula
+        probs = torch.softmax(logits / 0.7, dim=1)
         
         # Tüm pass'lerin olasılık ortalamalarını al (Shape: [1, num_classes])
         avg_probs = probs.mean(dim=0)

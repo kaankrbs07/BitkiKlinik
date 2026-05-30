@@ -67,6 +67,15 @@ const adminMenuItems = [
     bgColor: '#f5f3ff',
     route: '/(admin)/hangfire',
   },
+  {
+    id: 'rabbitmq',
+    title: 'RabbitMQ Kuyruk İzleme',
+    subtitle: 'Canlı active learning kuyruk metriklerini ve worker durumunu izle',
+    icon: 'logo-buffer' as any, // using 'logo-buffer' or 'server-outline' or 'git-network'
+    color: '#ff6600',
+    bgColor: '#fff0e6',
+    route: '/(admin)/rabbitmq',
+  },
 ];
 
 export default function AdminDashboardScreen() {

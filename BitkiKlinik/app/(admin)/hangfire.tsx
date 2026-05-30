@@ -87,7 +87,6 @@ export default function HangfireDashboardScreen() {
   });
   const [jobs, setJobs] = useState<HangfireJob[]>([]);
   const [activeTab, setActiveTab] = useState<JobStatus>('processing');
-  const [searchQuery, setSearchQuery] = useState('');
   
   const [isLoadingStats, setIsLoadingStats] = useState(true);
   const [isLoadingJobs, setIsLoadingJobs] = useState(false);
@@ -217,12 +216,7 @@ export default function HangfireDashboardScreen() {
     Alert.alert('Başarılı', 'Hata detayı panoya kopyalandı.');
   };
 
-  // Arama Filtresi
-  const filteredJobs = jobs.filter(
-    (job) =>
-      job.jobName.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      job.className.toLowerCase().includes(searchQuery.toLowerCase())
-  );
+
 
   // Tarih Formatlayıcı Yardımcı Metot
   const formatDate = (dateStr?: string) => {
@@ -313,21 +307,7 @@ export default function HangfireDashboardScreen() {
           </ScrollView>
         </View>
 
-        {/* Arama Çubuğu */}
-        <View style={s.searchBarContainer}>
-          <Ionicons name="search" size={18} color={C.slateLight} style={{ marginRight: 8 }} />
-          <TextInput
-            style={s.searchBarInput}
-            placeholder="İş adına veya metod adına göre filtrele..."
-            value={searchQuery}
-            onChangeText={setSearchQuery}
-          />
-          {searchQuery.length > 0 && (
-            <TouchableOpacity onPress={() => setSearchQuery('')}>
-              <Ionicons name="close" size={18} color={C.slateLight} />
-            </TouchableOpacity>
-          )}
-        </View>
+
 
         {/* İşlerin Listesi */}
         {isLoadingJobs ? (
@@ -337,7 +317,7 @@ export default function HangfireDashboardScreen() {
           </View>
         ) : (
           <FlatList
-            data={filteredJobs}
+            data={jobs}
             keyExtractor={(item) => item.id}
             contentContainerStyle={s.listContent}
             refreshControl={
@@ -640,23 +620,10 @@ const s = StyleSheet.create({
   statsLabel: { fontSize: 12, fontWeight: '700' },
   statsValue: { fontSize: 22, fontWeight: 'bold', marginTop: 4 },
 
-  // Arama Çubuğu
-  searchBarContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: C.white,
-    borderRadius: 12,
-    marginHorizontal: 20,
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    marginBottom: 12,
-    borderWidth: 1,
-    borderColor: C.border,
-  },
-  searchBarInput: { flex: 1, fontSize: 14, color: C.slate, paddingVertical: 2 },
+
 
   // List Content
-  listContent: { paddingHorizontal: 20, paddingBottom: 40 },
+  listContent: { paddingHorizontal: 20, paddingTop: 16, paddingBottom: 40 },
   jobCard: {
     flexDirection: 'row',
     backgroundColor: C.white,
