@@ -114,7 +114,7 @@ public class ChatController : ControllerBase
 
                 // Hastalık detayını ve tedavilerini çek (Önbellekleme Eklendi - Performans Optimizasyonu)
                 var cacheKey = $"DiseaseRAG_{scan.DiseaseName}";
-                if (!_cache.TryGetValue(cacheKey, out string cachedRagData))
+                if (!_cache.TryGetValue(cacheKey, out string? cachedRagData))
                 {
                     var disease = (await _diseaseService.FindAsync(d => d.Name == scan.DiseaseName)).FirstOrDefault();
                     TreatmentsResultDTO? treatments = null;
