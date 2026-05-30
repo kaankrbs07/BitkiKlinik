@@ -686,6 +686,27 @@ export default function HomeScreen() {
 
       setLocationGranted(true);
 
+      // ─── 15 Dakika Kontrolü (Throttling) ───
+      if (!forceRequest) {
+        try {
+          const lastUpdateTimeStr = await AsyncStorage.getItem('last_location_update_time');
+          if (lastUpdateTimeStr) {
+            const lastUpdateTime = parseInt(lastUpdateTimeStr, 10);
+            if (Date.now() - lastUpdateTime < 15 * 60 * 1000) {
+              // Son 15 dakika içinde konum başarıyla güncellenmiş. 
+              // Yeniden UPDATE_LOCATION isteği atmıyoruz, sadece veritabanından son riski çekiyoruz.
+              const response = await dotnetClient.get(API_ROUTES.LATEST_RISK_ALERT);
+              setRiskAlert(response.data);
+              checkAndShowLocalRiskNotification(response.data);
+              setIsRiskLoading(false);
+              return;
+            }
+          }
+        } catch (storageErr) {
+          console.error("Önbellek süresi okunurken hata:", storageErr);
+        }
+      }
+
       // Konum bilgisini al
       const location = await Location.getCurrentPositionAsync({ 
         accuracy: Location.Accuracy.Balanced 
@@ -710,6 +731,13 @@ export default function HomeScreen() {
         longitude,
         expoPushToken: pushToken
       });
+
+      // Güncelleme başarılı olduğunda zaman damgasını AsyncStorage'a kaydet
+      try {
+        await AsyncStorage.setItem('last_location_update_time', Date.now().toString());
+      } catch (storageErr) {
+        console.error("Zaman damgası kaydedilemedi:", storageErr);
+      }
 
       if (response.data?.latestRisk) {
         setRiskAlert(response.data.latestRisk);

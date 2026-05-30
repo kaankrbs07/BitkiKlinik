@@ -155,15 +155,44 @@ public class DiseaseRiskForecastingService : BackgroundService
             }
         }
 
-        // 3. Toplu yazma (Batching): Tüm risk uyarılarını tek bir SaveChangesAsync() ile veritabanına kaydediyoruz.
+        // 3. Toplu güncelleme / yazma (Upsert): Veritabanındaki eski kayıtları güncelliyoruz veya yenilerini ekliyoruz.
         if (alertsToSave.Any())
         {
-            _logger.LogInformation("{Count} adet tarımsal risk uyarısı toplu olarak kaydediliyor...", alertsToSave.Count);
+            _logger.LogInformation("{Count} adet tarımsal risk uyarısı kaydediliyor / güncelleniyor...", alertsToSave.Count);
             
             await using (var scope = _services.CreateAsyncScope())
             {
                 var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
-                await db.DiseaseRiskAlerts.AddRangeAsync(alertsToSave, stoppingToken);
+                
+                var userIds = alertsToSave.Select(a => a.UserId).Distinct().ToList();
+                var existingAlerts = await db.DiseaseRiskAlerts
+                    .Where(a => userIds.Contains(a.UserId) && a.DiseaseName == "Mildiyö (Geç Yanıklık)")
+                    .ToListAsync(stoppingToken);
+
+                var existingAlertsDict = existingAlerts.ToDictionary(a => a.UserId);
+                var alertsToAdd = new List<DiseaseRiskAlert>();
+
+                foreach (var alert in alertsToSave)
+                {
+                    if (existingAlertsDict.TryGetValue(alert.UserId, out var existingAlert))
+                    {
+                        existingAlert.RiskPercentage = alert.RiskPercentage;
+                        existingAlert.RiskLevel = alert.RiskLevel;
+                        existingAlert.Suggestion = alert.Suggestion;
+                        existingAlert.CalculatedAt = alert.CalculatedAt;
+                        db.DiseaseRiskAlerts.Update(existingAlert);
+                    }
+                    else
+                    {
+                        alertsToAdd.Add(alert);
+                    }
+                }
+
+                if (alertsToAdd.Any())
+                {
+                    await db.DiseaseRiskAlerts.AddRangeAsync(alertsToAdd, stoppingToken);
+                }
+
                 await db.SaveChangesAsync(stoppingToken);
             }
 
@@ -174,7 +203,7 @@ public class DiseaseRiskForecastingService : BackgroundService
                     job => job.SendAsync(push.PushToken, push.RiskPercentage, push.Suggestion));
             }
 
-            _logger.LogInformation("Tüm tarımsal risk uyarıları kaydedildi ve {PushCount} adet push bildirimi kuyruğa alındı.", pushNotificationsToEnqueue.Count);
+            _logger.LogInformation("Tüm tarımsal risk uyarıları güncellendi/kaydedildi ve {PushCount} adet push bildirimi kuyruğa alındı.", pushNotificationsToEnqueue.Count);
         }
     }
 

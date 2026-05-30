@@ -138,20 +138,33 @@ public class DiseaseRiskAlertsController : ControllerBase
                 newRiskLevel = result.RiskLevel;
                 newSuggestion = result.Suggestion;
 
-                var alert = new DiseaseRiskAlert
-                {
-                    UserId = userId,
-                    DiseaseName = "Mildiyö (Geç Yanıklık)",
-                    RiskPercentage = newRiskPercentage,
-                    RiskLevel = newRiskLevel,
-                    Suggestion = newSuggestion,
-                    CalculatedAt = DateTime.UtcNow
-                };
+                var existingAlert = await _context.DiseaseRiskAlerts
+                    .FirstOrDefaultAsync(a => a.UserId == userId && a.DiseaseName == "Mildiyö (Geç Yanıklık)");
 
-                _context.DiseaseRiskAlerts.Add(alert);
+                if (existingAlert != null)
+                {
+                    existingAlert.RiskPercentage = newRiskPercentage;
+                    existingAlert.RiskLevel = newRiskLevel;
+                    existingAlert.Suggestion = newSuggestion;
+                    existingAlert.CalculatedAt = DateTime.UtcNow;
+                    _context.DiseaseRiskAlerts.Update(existingAlert);
+                }
+                else
+                {
+                    var alert = new DiseaseRiskAlert
+                    {
+                        UserId = userId,
+                        DiseaseName = "Mildiyö (Geç Yanıklık)",
+                        RiskPercentage = newRiskPercentage,
+                        RiskLevel = newRiskLevel,
+                        Suggestion = newSuggestion,
+                        CalculatedAt = DateTime.UtcNow
+                    };
+                    _context.DiseaseRiskAlerts.Add(alert);
+                }
                 await _context.SaveChangesAsync();
 
-                _logger.LogInformation("İlk anlık risk hesaplaması başarıyla kaydedildi: %{Risk} ({Level})", 
+                _logger.LogInformation("Anlık risk hesaplaması başarıyla güncellendi/kaydedildi: %{Risk} ({Level})", 
                     newRiskPercentage, newRiskLevel);
             }
 
