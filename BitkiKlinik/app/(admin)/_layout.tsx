@@ -1,4 +1,4 @@
-import { Stack, useRouter } from 'expo-router';
+import { Stack, useRouter, useSegments } from 'expo-router';
 import React, { useEffect } from 'react';
 import { useShallow } from 'zustand/react/shallow';
 import { useAuthStore } from '../../store/useAuthStore';
@@ -13,20 +13,19 @@ export default function AdminLayout() {
     useShallow((state) => ({ isAdmin: state.isAdmin, isAuthenticated: state.isAuthenticated }))
   );
   const router = useRouter();
+  const segments = useSegments();
 
-  // ── Route Guard: Giriş yapmış ama Admin değilse geri gönder ────────────────
-  // Not: Giriş yapmamış kullanıcılar zaten Root Layout tarafından
-  // /(auth)/login'e yönlendirilir, bu yüzden burada sadece
-  // "giriş yapmış ama admin değil" durumunu kontrol ediyoruz.
+  // ── Route Guard: Giriş yapmış ama Admin değilse ve admin sayfalarındaysa geri gönder ──
   useEffect(() => {
-    if (isAuthenticated && !isAdmin) {
+    const isCurrentlyInAdmin = segments[0] === '(admin)';
+    if (isAuthenticated && !isAdmin && isCurrentlyInAdmin) {
       const timeout = setTimeout(() => {
         console.log('[AdminLayout] Yetkisiz erişim, yönlendiriliyor...');
         router.replace('/(tabs)');
       }, 0);
       return () => clearTimeout(timeout);
     }
-  }, [isAdmin, isAuthenticated]);
+  }, [isAdmin, isAuthenticated, segments]);
 
   // Stack her zaman render edilmeli — navigator mount olmadan navigate çağrısı
   // "Attempted to navigate before mounting" hatasına yol açar.

@@ -2,8 +2,8 @@ import { DarkTheme, DefaultTheme, ThemeProvider } from '@react-navigation/native
 import { Stack, useRouter, useSegments } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import 'react-native-reanimated';
-import { useEffect } from 'react';
-import { LogBox } from 'react-native';
+import { useEffect, useState } from 'react';
+import { LogBox, ActivityIndicator, View } from 'react-native';
 import { jwtDecode } from 'jwt-decode';
 import { useShallow } from 'zustand/react/shallow';
 
@@ -48,6 +48,10 @@ export default function RootLayout() {
   const segments = useSegments();
   const router = useRouter();
 
+  // Oturum süresi dolmuşsa başlangıçta sessiz yenileme işlemini bekliyoruz
+  const isExpired = isAuthenticated && token && isTokenExpired(token);
+  const [isSessionChecking, setIsSessionChecking] = useState(!!isExpired);
+
   useEffect(() => {
     let isMounted = true;
 
@@ -60,6 +64,7 @@ export default function RootLayout() {
             const { data } = await dotnetClient.post('/Auth/refresh', { refreshToken });
             login(data.token, data.refreshToken);
             console.log('[RootLayout] Sessiz yenileme başarılı!');
+            if (isMounted) setIsSessionChecking(false);
             return;
           } catch (e) {
             console.warn('[RootLayout] Sessiz yenileme başarısız:', e);
@@ -68,6 +73,7 @@ export default function RootLayout() {
         console.log('[RootLayout] Kalıcı oturum açılamadı, çıkış yapılıyor...');
         storeLogout();
       }
+      if (isMounted) setIsSessionChecking(false);
     };
 
     checkAndRefreshSession();
@@ -76,6 +82,7 @@ export default function RootLayout() {
     // Bu, NavigationContainer'ın onReady callback'inin çalışmasını garanti eder.
     const timeout = setTimeout(() => {
       if (!isMounted) return;
+      if (isSessionChecking) return; // Sessiz yenileme bitmeden yönlendirme yapma
       
       const inAuthGroup  = segments[0] === '(auth)';
       const isVerifyScreen = segments[1] === 'verify';
@@ -102,7 +109,24 @@ export default function RootLayout() {
       isMounted = false;
       clearTimeout(timeout);
     };
-  }, [isAuthenticated, isVerified, token, segments]);
+  }, [isAuthenticated, isVerified, token, segments, isSessionChecking]);
+
+  // Sessiz yenileme sırasında şık ve premium bir yüklenme ekranı göster
+  if (isSessionChecking) {
+    const isDark = colorScheme === 'dark';
+    return (
+      <ThemeProvider value={isDark ? DarkTheme : DefaultTheme}>
+        <View style={{ 
+          flex: 1, 
+          justifyContent: 'center', 
+          alignItems: 'center', 
+          backgroundColor: isDark ? '#121212' : '#ffffff' 
+        }}>
+          <ActivityIndicator size="large" color="#4CAF50" />
+        </View>
+      </ThemeProvider>
+    );
+  }
   return (
     <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
       <NetworkBanner />

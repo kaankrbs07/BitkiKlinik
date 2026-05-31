@@ -63,6 +63,16 @@ dotnetClient.interceptors.response.use(
         return Promise.reject(error);
       }
 
+      // EĞER store'daki token, istek atılırken kullanılan token'dan farklıysa;
+      // demek ki biz 401 alana kadar başka bir yerde token çoktan başarıyla yenilenmiş!
+      // Tekrar yenilemeye çalışmak yerine direkt yeni token ile isteği tekrarlayalım.
+      const authHeader = originalRequest.headers.Authorization || originalRequest.headers.authorization;
+      const sentToken = typeof authHeader === 'string' ? authHeader.replace('Bearer ', '') : null;
+      if (sentToken && currentToken !== sentToken) {
+        originalRequest.headers.Authorization = `Bearer ${currentToken}`;
+        return dotnetClient(originalRequest);
+      }
+
       if (isRefreshing) {
         // Başka bir istek zaten refresh yapıyor; tamamlanınca yeniden dene
         return new Promise((resolve, reject) => {
