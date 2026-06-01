@@ -19,9 +19,10 @@ import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import Animated, { FadeInDown } from 'react-native-reanimated';
 import { dotnetClient } from '../../api/client';
+import { useAppTheme } from '../../hooks/useAppTheme';
 
-// ─── Renk Paleti (Premium Violet / HSL Harika Uyum) ─────────────────
-const C = {
+// ─── Renk Paletleri (Premium Violet / HSL Harika Uyum) ─────────────────
+const LIGHT_C = {
   primary: '#8b5cf6',       // Violet
   primaryLight: '#f5f3ff',
   emerald: '#10b981',       // Success
@@ -39,6 +40,30 @@ const C = {
   blueLight: '#eff6ff',
   queued: '#64748b',        // Queued
   queuedLight: '#f1f5f9',
+  cardBg: '#ffffff',
+  slateBg: '#f1f5f9',
+};
+
+const DARK_C = {
+  primary: '#a78bfa',
+  primaryLight: '#4c1d95',
+  emerald: '#10b981',
+  emeraldLight: '#064e3b',
+  amber: '#fbbf24',
+  amberLight: '#78350f',
+  rose: '#f87171',
+  roseLight: '#7f1d1d',
+  slate: '#f8fafc',
+  slateLight: '#94a3b8',
+  bg: '#0f172a',
+  white: '#1e293b',
+  border: '#334155',
+  blue: '#60a5fa',
+  blueLight: '#1e3a8a',
+  queued: '#94a3b8',
+  queuedLight: '#334155',
+  cardBg: '#1e293b',
+  slateBg: '#334155',
 };
 
 interface HangfireStats {
@@ -74,6 +99,10 @@ type JobStatus = 'processing' | 'queued' | 'failed' | 'succeeded' | 'scheduled';
 
 export default function HangfireDashboardScreen() {
   const router = useRouter();
+  const { isDark } = useAppTheme();
+
+  const C = isDark ? DARK_C : LIGHT_C;
+  const s = getStyles(C);
 
   // ─── State Tanımları ────────────────────────────────────────────────
   const [stats, setStats] = useState<HangfireStats>({
@@ -216,8 +245,6 @@ export default function HangfireDashboardScreen() {
     Alert.alert('Başarılı', 'Hata detayı panoya kopyalandı.');
   };
 
-
-
   // Tarih Formatlayıcı Yardımcı Metot
   const formatDate = (dateStr?: string) => {
     if (!dateStr) return '-';
@@ -250,7 +277,7 @@ export default function HangfireDashboardScreen() {
 
   return (
     <View style={s.container}>
-      <StatusBar barStyle="dark-content" />
+      <StatusBar barStyle={isDark ? "light-content" : "dark-content"} />
       <SafeAreaView style={{ flex: 1 }}>
         
         {/* Header */}
@@ -261,8 +288,8 @@ export default function HangfireDashboardScreen() {
           <View style={{ flex: 1 }}>
             <Text style={s.headerTitle}>Hangfire İşleri ⚙️</Text>
             <Text style={s.headerSubtitle}>
-              {stats.servers > 0 ? `🟢 ${stats.servers} Aktif Sunucu` : '🔴 Sunucu Bağlantısı Yok'}
-              {stats.recurring > 0 ? ` | ⏱️ ${stats.recurring} Periyodik İş` : ''}
+              {stats.servers > 0 ? `🟢 ${stats.servers} Sunucu` : '🔴 Sunucu Yok'}
+              {stats.recurring > 0 ? ` | ⏱️ ${stats.recurring} Periyodik` : ''}
             </Text>
           </View>
           <TouchableOpacity style={s.refreshBtn} onPress={refreshAll} disabled={isLoadingStats || isLoadingJobs}>
@@ -306,8 +333,6 @@ export default function HangfireDashboardScreen() {
             ))}
           </ScrollView>
         </View>
-
-
 
         {/* İşlerin Listesi */}
         {isLoadingJobs ? (
@@ -525,7 +550,7 @@ export default function HangfireDashboardScreen() {
                         style={[s.modalBtn, { backgroundColor: C.emerald }]}
                         onPress={() => handleRequeue(selectedJob.id)}
                       >
-                        <Ionicons name="play" size={18} color={C.white} style={{ marginRight: 6 }} />
+                        <Ionicons name="play" size={18} color={LIGHT_C.white} style={{ marginRight: 6 }} />
                         <Text style={s.modalBtnTxt}>Yeniden Sıraya Al</Text>
                       </TouchableOpacity>
                     )}
@@ -533,7 +558,7 @@ export default function HangfireDashboardScreen() {
                       style={[s.modalBtn, { backgroundColor: C.rose }]}
                       onPress={() => handleDelete(selectedJob.id)}
                     >
-                      <Ionicons name="trash-outline" size={18} color={C.white} style={{ marginRight: 6 }} />
+                      <Ionicons name="trash-outline" size={18} color={LIGHT_C.white} style={{ marginRight: 6 }} />
                       <Text style={s.modalBtnTxt}>İşi Sil</Text>
                     </TouchableOpacity>
                   </View>
@@ -549,7 +574,7 @@ export default function HangfireDashboardScreen() {
   );
 }
 
-const s = StyleSheet.create({
+const getStyles = (C: any) => StyleSheet.create({
   container: { flex: 1, backgroundColor: C.bg },
   header: {
     flexDirection: 'row',
@@ -563,7 +588,7 @@ const s = StyleSheet.create({
     width: 40,
     height: 40,
     borderRadius: 12,
-    backgroundColor: C.white,
+    backgroundColor: C.cardBg,
     justifyContent: 'center',
     alignItems: 'center',
     shadowColor: '#000',
@@ -578,7 +603,7 @@ const s = StyleSheet.create({
     width: 40,
     height: 40,
     borderRadius: 12,
-    backgroundColor: C.white,
+    backgroundColor: C.cardBg,
     justifyContent: 'center',
     alignItems: 'center',
     shadowColor: '#000',
@@ -606,7 +631,7 @@ const s = StyleSheet.create({
     paddingHorizontal: 16,
     paddingVertical: 12,
     borderRadius: 16,
-    backgroundColor: C.white,
+    backgroundColor: C.cardBg,
     minWidth: 100,
     alignItems: 'center',
     borderColor: 'transparent',
@@ -620,13 +645,11 @@ const s = StyleSheet.create({
   statsLabel: { fontSize: 12, fontWeight: '700' },
   statsValue: { fontSize: 22, fontWeight: 'bold', marginTop: 4 },
 
-
-
   // List Content
   listContent: { paddingHorizontal: 20, paddingTop: 16, paddingBottom: 40 },
   jobCard: {
     flexDirection: 'row',
-    backgroundColor: C.white,
+    backgroundColor: C.cardBg,
     borderRadius: 16,
     padding: 14,
     marginBottom: 10,
@@ -650,7 +673,7 @@ const s = StyleSheet.create({
   statusBadgeTxt: { fontSize: 9, fontWeight: '700' },
   jobClass: { fontSize: 12, color: C.slateLight, marginBottom: 8 },
   jobMetaInfo: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 6 },
-  jobMetaTxt: { fontSize: 11, color: C.slateLight, backgroundColor: '#f1f5f9', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4 },
+  jobMetaTxt: { fontSize: 11, color: C.slateLight, backgroundColor: C.slateBg, paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4 },
   jobDate: { fontSize: 10, color: C.slateLight },
 
   // Job Actions
@@ -673,9 +696,9 @@ const s = StyleSheet.create({
   emptyStateSub: { fontSize: 13, color: C.slateLight, textAlign: 'center', marginTop: 4 },
 
   // Modal
-  modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end' },
+  modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.6)', justifyContent: 'flex-end' },
   modalContent: {
-    backgroundColor: C.white,
+    backgroundColor: C.cardBg,
     borderTopLeftRadius: 24,
     borderTopRightRadius: 24,
     paddingHorizontal: 20,
@@ -706,12 +729,12 @@ const s = StyleSheet.create({
 
   detailGroup: { marginBottom: 16 },
   detailLabel: { fontSize: 12, fontWeight: '700', color: C.slateLight, textTransform: 'uppercase', marginBottom: 4, letterSpacing: 0.5 },
-  detailValue: { fontSize: 15, fontWeight: '600', color: C.slate, backgroundColor: '#f8fafc', padding: 12, borderRadius: 10, borderWidth: 1, borderColor: C.border },
+  detailValue: { fontSize: 15, fontWeight: '600', color: C.slate, backgroundColor: C.bg, padding: 12, borderRadius: 10, borderWidth: 1, borderColor: C.border },
   
   argumentsBox: { backgroundColor: '#0f172a', padding: 12, borderRadius: 10 },
   argumentTxt: { color: '#38bdf8', fontSize: 12, fontFamily: 'monospace' },
 
-  timestampsBox: { backgroundColor: '#f8fafc', padding: 12, borderRadius: 10, borderStyle: 'solid', borderWidth: 1, borderColor: C.border },
+  timestampsBox: { backgroundColor: C.bg, padding: 12, borderRadius: 10, borderStyle: 'solid', borderWidth: 1, borderColor: C.border },
   timeRow: { fontSize: 12, color: C.slate, marginVertical: 2 },
 
   // Loglar
@@ -737,5 +760,5 @@ const s = StyleSheet.create({
     shadowRadius: 4,
     elevation: 2,
   },
-  modalBtnTxt: { color: C.white, fontWeight: '700', fontSize: 14 },
+  modalBtnTxt: { color: LIGHT_C.white, fontWeight: '700', fontSize: 14 },
 });

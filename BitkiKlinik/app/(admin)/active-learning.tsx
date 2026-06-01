@@ -12,6 +12,7 @@ import {
   TextInput,
   ActivityIndicator,
   FlatList,
+  StatusBar,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
@@ -20,26 +21,59 @@ import Animated, { FadeInDown } from 'react-native-reanimated';
 import { useActiveLearning, ActiveLearningPendingItem } from '../../hooks/useActiveLearning';
 import { useAdminDiseases } from '../../hooks/useAdminDiseases';
 import { CONFIG } from '../../constants/config';
+import { useAppTheme } from '../../hooks/useAppTheme';
 
-// ─── Renk Paleti ─────────────────────────────────────────────────────
-const C = {
-  primary: '#6366f1',       // Indigo
+// ─── Renk Paletleri ──────────────────────────────────────────────────
+const LIGHT_C = {
+  primary: '#6366f1',
   primaryLight: '#eef2ff',
-  emerald: '#10b981',       // Success
+  emerald: '#10b981',
   emeraldLight: '#dcfce7',
-  amber: '#f59e0b',         // Warning/Low Confidence
+  amber: '#f59e0b',
   amberLight: '#fef3c7',
-  rose: '#f43f5e',           // User Flagged/Danger
+  rose: '#f43f5e',
   roseLight: '#ffe4e6',
-  slate: '#0f172a',         // Main Text/Dark
-  slateLight: '#64748b',    // Subtitle
-  bg: '#f8fafc',            // Light gray bg
+  slate: '#0f172a',
+  slateLight: '#64748b',
+  bg: '#f8fafc',
   white: '#ffffff',
   border: '#e2e8f0',
+  cardBg: '#ffffff',
+  warningBg: '#fffbeb',
+  warningBorder: '#fde68a',
+  warningText: '#92400e',
+  warningTextLight: '#b45309',
+  warningIconBg: '#fef3c7',
+};
+
+const DARK_C = {
+  primary: '#818cf8',
+  primaryLight: '#312e81',
+  emerald: '#10b981',
+  emeraldLight: '#064e3b',
+  amber: '#fbbf24',
+  amberLight: '#78350f',
+  rose: '#f87171',
+  roseLight: '#7f1d1d',
+  slate: '#f8fafc',
+  slateLight: '#94a3b8',
+  bg: '#0f172a',
+  white: '#1e293b',
+  border: '#334155',
+  cardBg: '#1e293b',
+  warningBg: '#78350f40',
+  warningBorder: '#78350f80',
+  warningText: '#fbbf24',
+  warningTextLight: '#fbbf24cc',
+  warningIconBg: '#78350f60',
 };
 
 export default function ActiveLearningScreen() {
   const router = useRouter();
+  const { isDark } = useAppTheme();
+  
+  const C = isDark ? DARK_C : LIGHT_C;
+  const s = getStyles(C);
   
   // Custom hooks
   const {
@@ -161,6 +195,7 @@ export default function ActiveLearningScreen() {
 
   return (
     <View style={s.container}>
+      <StatusBar barStyle={isDark ? "light-content" : "dark-content"} />
       <SafeAreaView style={{ flex: 1 }}>
         {/* Header */}
         <View style={s.header}>
@@ -517,7 +552,7 @@ export default function ActiveLearningScreen() {
   );
 }
 
-const s = StyleSheet.create({
+const getStyles = (C: any) => StyleSheet.create({
   container: { flex: 1, backgroundColor: C.bg },
   header: {
     flexDirection: 'row',
@@ -581,7 +616,7 @@ const s = StyleSheet.create({
     elevation: 1,
   },
   statsLabel: { fontSize: 11, fontWeight: '600', color: C.slateLight },
-  statsValue: { fontSize: 20, fontWeight: 'bold', marginTop: 4 },
+  statsValue: { fontSize: 20, fontWeight: 'bold', marginTop: 4, color: C.slate },
 
   // Panel
   trainingPanel: {
@@ -607,18 +642,18 @@ const s = StyleSheet.create({
     paddingVertical: 8,
     borderRadius: 10,
   },
-  retrainBtnTxt: { color: C.white, fontSize: 12, fontWeight: 'bold' },
+  retrainBtnTxt: { color: LIGHT_C.white, fontSize: 12, fontWeight: 'bold' },
   btnDisabled: { opacity: 0.5 },
 
   // Yetersiz Veri Banner Stilleri
   insufficientDataBanner: {
-    backgroundColor: '#fffbeb',
+    backgroundColor: C.warningBg,
     borderRadius: 16,
     padding: 16,
     marginBottom: 12,
     borderWidth: 1,
-    borderColor: '#fde68a',
-    shadowColor: '#f59e0b',
+    borderColor: C.warningBorder,
+    shadowColor: C.amber,
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.08,
     shadowRadius: 6,
@@ -633,19 +668,19 @@ const s = StyleSheet.create({
     width: 36,
     height: 36,
     borderRadius: 10,
-    backgroundColor: '#fef3c7',
+    backgroundColor: C.warningIconBg,
     justifyContent: 'center',
     alignItems: 'center',
   },
   insufficientDataTitle: {
     fontSize: 14,
     fontWeight: '700',
-    color: '#92400e',
+    color: C.warningText,
     marginBottom: 2,
   },
   insufficientDataSubtitle: {
     fontSize: 12,
-    color: '#b45309',
+    color: C.warningTextLight,
     lineHeight: 17,
   },
   sampleProgressContainer: {
@@ -658,7 +693,7 @@ const s = StyleSheet.create({
     flex: 1,
     height: 8,
     borderRadius: 4,
-    backgroundColor: '#fde68a',
+    backgroundColor: C.warningBorder,
     overflow: 'hidden',
   },
   sampleProgressFill: {
@@ -668,13 +703,13 @@ const s = StyleSheet.create({
   sampleProgressText: {
     fontSize: 12,
     fontWeight: '700',
-    color: '#b45309',
+    color: C.warningTextLight,
     minWidth: 40,
     textAlign: 'right',
   },
   insufficientDataHint: {
     fontSize: 12,
-    color: '#92400e',
+    color: C.warningText,
     lineHeight: 18,
   },
   spinning: {
@@ -769,7 +804,7 @@ const s = StyleSheet.create({
     elevation: 3,
   },
   modalQuickCorrectBtnTxt: {
-    color: C.white,
+    color: LIGHT_C.white,
     fontSize: 14,
     fontWeight: '700',
   },
@@ -780,7 +815,7 @@ const s = StyleSheet.create({
   emptyStateSub: { fontSize: 13, color: C.slateLight, textAlign: 'center', marginTop: 4 },
 
   // Modal
-  modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end' },
+  modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.6)', justifyContent: 'flex-end' },
   modalContent: {
     backgroundColor: C.white,
     borderTopLeftRadius: 24,

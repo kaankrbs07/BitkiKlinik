@@ -8,16 +8,16 @@ import {
   RefreshControl,
   ActivityIndicator,
   StatusBar,
-  Alert,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import Animated, { FadeInDown } from 'react-native-reanimated';
 import { dotnetClient } from '../../api/client';
+import { useAppTheme } from '../../hooks/useAppTheme';
 
-// ─── Renk Paleti (RabbitMQ Orange & Premium Slate) ──────────────────
-const C = {
+// ─── Renk Paletleri (RabbitMQ Orange & Premium Slate) ──────────────────
+const LIGHT_C = {
   primary: '#ff6600',         // RabbitMQ Klasik Turuncu
   primaryLight: '#fff0e6',
   emerald: '#10b981',         // Sağlıklı / Çalışıyor (Yeşil)
@@ -33,6 +33,26 @@ const C = {
   border: '#e2e8f0',
   blue: '#3b82f6',            // İşlem / Detay
   blueLight: '#eff6ff',
+  cardBg: '#ffffff',
+};
+
+const DARK_C = {
+  primary: '#ff771a',         // Lightened orange for dark theme
+  primaryLight: '#592400',
+  emerald: '#10b981',
+  emeraldLight: '#064e3b',
+  rose: '#f87171',
+  roseLight: '#7f1d1d',
+  amber: '#fbbf24',
+  amberLight: '#78350f',
+  slate: '#f8fafc',
+  slateLight: '#94a3b8',
+  bg: '#0f172a',
+  white: '#1e293b',
+  border: '#334155',
+  blue: '#60a5fa',
+  blueLight: '#1e3a8a',
+  cardBg: '#1e293b',
 };
 
 interface RabbitMqMetrics {
@@ -48,6 +68,10 @@ interface RabbitMqMetrics {
 
 export default function RabbitMqDashboardScreen() {
   const router = useRouter();
+  const { isDark } = useAppTheme();
+
+  const C = isDark ? DARK_C : LIGHT_C;
+  const s = getStyles(C);
 
   // ─── State Tanımları ────────────────────────────────────────────────
   const [metrics, setMetrics] = useState<RabbitMqMetrics | null>(null);
@@ -88,7 +112,7 @@ export default function RabbitMqDashboardScreen() {
 
   return (
     <View style={s.container}>
-      <StatusBar barStyle="dark-content" />
+      <StatusBar barStyle={isDark ? "light-content" : "dark-content"} />
       <SafeAreaView style={{ flex: 1 }}>
         
         {/* Header */}
@@ -281,7 +305,7 @@ export default function RabbitMqDashboardScreen() {
               onPress={() => router.push('/(admin)/active-learning')}
               activeOpacity={0.8}
             >
-              <Ionicons name="bulb" size={20} color={C.white} style={{ marginRight: 8 }} />
+              <Ionicons name="bulb" size={20} color={LIGHT_C.white} style={{ marginRight: 8 }} />
               <Text style={s.actionBtnTxt}>Aktif Öğrenme Paneline Git</Text>
             </TouchableOpacity>
           </Animated.View>
@@ -292,7 +316,7 @@ export default function RabbitMqDashboardScreen() {
   );
 }
 
-const s = StyleSheet.create({
+const getStyles = (C: any) => StyleSheet.create({
   container: { flex: 1, backgroundColor: C.bg },
   header: {
     flexDirection: 'row',
@@ -306,7 +330,7 @@ const s = StyleSheet.create({
     width: 40,
     height: 40,
     borderRadius: 12,
-    backgroundColor: C.white,
+    backgroundColor: C.cardBg,
     justifyContent: 'center',
     alignItems: 'center',
     shadowColor: '#000',
@@ -321,7 +345,7 @@ const s = StyleSheet.create({
     width: 40,
     height: 40,
     borderRadius: 12,
-    backgroundColor: C.white,
+    backgroundColor: C.cardBg,
     justifyContent: 'center',
     alignItems: 'center',
     shadowColor: '#000',
@@ -343,14 +367,14 @@ const s = StyleSheet.create({
     borderRadius: 16,
     marginBottom: 16,
     borderWidth: 1,
-    borderColor: '#fca5a5',
+    borderColor: C.rose,
   },
   errTitle: { color: C.rose, fontSize: 15, fontWeight: 'bold', marginBottom: 2 },
-  errTxt: { color: '#be123c', fontSize: 13, lineHeight: 18 },
+  errTxt: { color: C.slate, fontSize: 13, lineHeight: 18 },
 
   // Sağlık Durum Kartı
   statusCard: {
-    backgroundColor: C.white,
+    backgroundColor: C.cardBg,
     borderRadius: 20,
     padding: 20,
     marginHorizontal: 20,
@@ -377,7 +401,7 @@ const s = StyleSheet.create({
   },
   gridCard: {
     flex: 1,
-    backgroundColor: C.white,
+    backgroundColor: C.cardBg,
     borderRadius: 20,
     padding: 16,
     alignItems: 'center',
@@ -401,7 +425,7 @@ const s = StyleSheet.create({
 
   // Performans Akış Hızı
   sectionContainer: {
-    backgroundColor: C.white,
+    backgroundColor: C.cardBg,
     borderRadius: 20,
     padding: 20,
     marginHorizontal: 20,
@@ -423,7 +447,7 @@ const s = StyleSheet.create({
 
   // Teknik Detaylar
   detailsCard: {
-    backgroundColor: C.white,
+    backgroundColor: C.cardBg,
     borderRadius: 20,
     padding: 20,
     marginHorizontal: 20,
@@ -440,7 +464,7 @@ const s = StyleSheet.create({
     justifyContent: 'space-between',
     paddingVertical: 12,
     borderBottomWidth: 1,
-    borderBottomColor: '#f1f5f9',
+    borderBottomColor: C.border,
   },
   detailName: { fontSize: 13, color: C.slateLight },
   detailVal: { fontSize: 13, fontWeight: '600', color: C.slate },
@@ -459,5 +483,5 @@ const s = StyleSheet.create({
     shadowRadius: 8,
     elevation: 4,
   },
-  actionBtnTxt: { color: C.white, fontWeight: '700', fontSize: 15 },
+  actionBtnTxt: { color: LIGHT_C.white, fontWeight: '700', fontSize: 15 },
 });

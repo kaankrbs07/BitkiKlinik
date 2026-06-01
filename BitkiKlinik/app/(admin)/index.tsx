@@ -12,9 +12,10 @@ import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import Animated, { FadeInDown } from 'react-native-reanimated';
 import { useAuthStore } from '../../store/useAuthStore';
+import { useAppTheme } from '../../hooks/useAppTheme';
 
-// ─── Renk Paleti ─────────────────────────────────────────────────────
-const COLORS = {
+// ─── Renk Paletleri ──────────────────────────────────────────────────
+const LIGHT_COLORS = {
   primary: '#6366f1',     // Indigo
   primaryLight: '#eef2ff',
   emerald: '#10b981',
@@ -29,76 +30,95 @@ const COLORS = {
   white: '#ffffff',
 };
 
-// ─── Admin Menü Kartları ─────────────────────────────────────────────
-const adminMenuItems = [
-  {
-    id: 'users',
-    title: 'Kullanıcı Yönetimi',
-    subtitle: 'Kullanıcıları listele, ekle ve yönet',
-    icon: 'people',
-    color: COLORS.primary,
-    bgColor: COLORS.primaryLight,
-    route: '/(admin)/users',
-  },
-  {
-    id: 'diseases',
-    title: 'Hastalık & Tedavi',
-    subtitle: 'Hastalık ve tedavi verilerini yönet',
-    icon: 'leaf',
-    color: COLORS.emerald,
-    bgColor: COLORS.emeraldLight,
-    route: '/(admin)/diseases',
-  },
-  {
-    id: 'active-learning',
-    title: 'Aktif Öğrenme & Eğitim',
-    subtitle: 'Yapay zekayı yeni verilerle eğit ve iyileştir',
-    icon: 'bulb',
-    color: COLORS.amber,
-    bgColor: COLORS.amberLight,
-    route: '/(admin)/active-learning',
-  },
-  {
-    id: 'hangfire',
-    title: 'Arka Plan İşleri (Hangfire)',
-    subtitle: 'Kuyruk durumlarını, e-posta ve bildirim işlerini yönet',
-    icon: 'time',
-    color: '#8b5cf6',
-    bgColor: '#f5f3ff',
-    route: '/(admin)/hangfire',
-  },
-  {
-    id: 'rabbitmq',
-    title: 'RabbitMQ Kuyruk İzleme',
-    subtitle: 'Canlı active learning kuyruk metriklerini ve worker durumunu izle',
-    icon: 'logo-buffer' as any, // using 'logo-buffer' or 'server-outline' or 'git-network'
-    color: '#ff6600',
-    bgColor: '#fff0e6',
-    route: '/(admin)/rabbitmq',
-  },
-  {
-    id: 'mlops',
-    title: 'MLOps & Model Performansı',
-    subtitle: 'Eğitim doğruluk grafiklerini ve veri dağılımını izle',
-    icon: 'bar-chart' as any, // 'bar-chart' or 'analytics'
-    color: '#3b82f6',
-    bgColor: '#eff6ff',
-    route: '/(admin)/mlops',
-  },
-];
+const DARK_COLORS = {
+  primary: '#818cf8',     // Indigo Lightened
+  primaryLight: '#312e81',
+  emerald: '#10b981',
+  emeraldLight: '#064e3b',
+  amber: '#fbbf24',
+  amberLight: '#78350f',
+  rose: '#f87171',
+  roseLight: '#7f1d1d',
+  slate: '#f8fafc',
+  slateLight: '#94a3b8',
+  background: '#0f172a',
+  white: '#1e293b',
+};
 
 export default function AdminDashboardScreen() {
   const router = useRouter();
   const { username, logout } = useAuthStore();
+  const { isDark } = useAppTheme();
+  
+  const COLORS = isDark ? DARK_COLORS : LIGHT_COLORS;
+  const styles = getStyles(COLORS);
 
   const handleLogout = () => {
     logout();
     router.replace('/(auth)/login');
   };
 
+  // ─── Admin Menü Kartları ─────────────────────────────────────────────
+  const adminMenuItems = [
+    {
+      id: 'users',
+      title: 'Kullanıcı Yönetimi',
+      subtitle: 'Kullanıcıları listele, ekle ve yönet',
+      icon: 'people',
+      color: COLORS.primary,
+      bgColor: COLORS.primaryLight,
+      route: '/(admin)/users',
+    },
+    {
+      id: 'diseases',
+      title: 'Hastalık & Tedavi',
+      subtitle: 'Hastalık ve tedavi verilerini yönet',
+      icon: 'leaf',
+      color: COLORS.emerald,
+      bgColor: COLORS.emeraldLight,
+      route: '/(admin)/diseases',
+    },
+    {
+      id: 'active-learning',
+      title: 'Aktif Öğrenme & Eğitim',
+      subtitle: 'Yapay zekayı yeni verilerle eğit ve iyileştir',
+      icon: 'bulb',
+      color: COLORS.amber,
+      bgColor: COLORS.amberLight,
+      route: '/(admin)/active-learning',
+    },
+    {
+      id: 'hangfire',
+      title: 'Arka Plan İşleri (Hangfire)',
+      subtitle: 'Kuyruk durumlarını, e-posta ve bildirim işlerini yönet',
+      icon: 'time',
+      color: isDark ? '#a78bfa' : '#8b5cf6',
+      bgColor: isDark ? '#4c1d95' : '#f5f3ff',
+      route: '/(admin)/hangfire',
+    },
+    {
+      id: 'rabbitmq',
+      title: 'RabbitMQ Kuyruk İzleme',
+      subtitle: 'Canlı active learning kuyruk metriklerini ve worker durumunu izle',
+      icon: 'logo-buffer' as any,
+      color: isDark ? '#ff8533' : '#ff6600',
+      bgColor: isDark ? '#803300' : '#fff0e6',
+      route: '/(admin)/rabbitmq',
+    },
+    {
+      id: 'mlops',
+      title: 'MLOps & Model Performansı',
+      subtitle: 'Eğitim doğruluk grafiklerini ve veri dağılımını izle',
+      icon: 'bar-chart' as any,
+      color: isDark ? '#60a5fa' : '#3b82f6',
+      bgColor: isDark ? '#1e3a8a' : '#eff6ff',
+      route: '/(admin)/mlops',
+    },
+  ];
+
   return (
     <View style={styles.container}>
-      <StatusBar barStyle="dark-content" />
+      <StatusBar barStyle={isDark ? "light-content" : "dark-content"} />
       <SafeAreaView style={{ flex: 1 }}>
         <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
           
@@ -149,7 +169,7 @@ export default function AdminDashboardScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const getStyles = (COLORS: any) => StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: COLORS.background,

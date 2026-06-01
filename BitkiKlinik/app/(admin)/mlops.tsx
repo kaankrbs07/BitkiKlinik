@@ -493,7 +493,7 @@ const getStyles = (colors: typeof LIGHT_COLORS) => StyleSheet.create({
   gridLine: {
     width: '100%',
     height: 1,
-    backgroundColor: '#f1f5f9',
+    backgroundColor: colors.border,
   },
   barColumn: {
     alignItems: 'center',
@@ -595,7 +595,7 @@ const getStyles = (colors: typeof LIGHT_COLORS) => StyleSheet.create({
 
   runSamplesBox: {
     flexDirection: 'row',
-    backgroundColor: '#f8fafc',
+    backgroundColor: colors.bg,
     borderRadius: 16,
     padding: 12,
     alignItems: 'center',
@@ -633,6 +633,6 @@ const getStyles = (colors: typeof LIGHT_COLORS) => StyleSheet.create({
   distClassLabel: { fontSize: 13, fontWeight: 'bold', color: colors.slate, flex: 1, marginRight: 12 },
   distClassCount: { fontSize: 12, color: colors.slateLight, fontWeight: '600' },
   
-  progressBarBg: { height: 8, backgroundColor: '#f1f5f9', borderRadius: 4, overflow: 'hidden' },
+  progressBarBg: { height: 8, backgroundColor: colors.border, borderRadius: 4, overflow: 'hidden' },
   progressBarFill: { height: '100%', borderRadius: 4 },
 });

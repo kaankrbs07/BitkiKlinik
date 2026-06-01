@@ -214,8 +214,8 @@ function StatsSection({ stats }: StatsSectionProps) {
 
   return (
     <Animated.View entering={FadeInDown.delay(200).duration(800)} style={styles.statsContainer}>
-      <View style={[styles.statCard, { backgroundColor: isDark ? COLORS.white : COLORS.slate }]}>
-        <Text style={[styles.statValue, { color: isDark ? COLORS.slate : COLORS.white }]}>{stats.total}</Text>
+      <View style={[styles.statCard, { backgroundColor: COLORS.white }]}>
+        <Text style={[styles.statValue, { color: COLORS.slate }]}>{stats.total}</Text>
         <Text style={styles.statLabel}>Toplam</Text>
       </View>
       <View style={[styles.statCard, { backgroundColor: COLORS.white }]}>

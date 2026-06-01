@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import {
   View, Text, StyleSheet, TouchableOpacity,
-  ScrollView, RefreshControl, Alert, TextInput, Modal,
+  ScrollView, RefreshControl, Alert, TextInput, Modal, StatusBar,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
@@ -9,9 +9,12 @@ import { Ionicons } from '@expo/vector-icons';
 import Animated, { FadeInDown } from 'react-native-reanimated';
 import { useAdminUsers, AdminUser, CreateUserPayload } from '../../hooks/useAdminUsers';
 import { useAuthStore } from '../../store/useAuthStore';
+import { useAppTheme } from '../../hooks/useAppTheme';
 
-const COLORS = {
+// ─── Renk Paletleri ──────────────────────────────────────────────────
+const LIGHT_COLORS = {
   primary: '#6366f1',
+  primaryLight: '#eef2ff',
   emerald: '#10b981',
   emeraldLight: '#dcfce7',
   danger: '#ef4444',
@@ -21,6 +24,26 @@ const COLORS = {
   slateLight: '#64748b',
   background: '#f8fafc',
   white: '#ffffff',
+  border: '#e2e8f0',
+  cardBg: '#ffffff',
+  slateBg: '#f1f5f9',
+};
+
+const DARK_COLORS = {
+  primary: '#818cf8',
+  primaryLight: '#312e81',
+  emerald: '#10b981',
+  emeraldLight: '#064e3b',
+  danger: '#f87171',
+  dangerLight: '#7f1d1d',
+  amber: '#fbbf24',
+  slate: '#f8fafc',
+  slateLight: '#94a3b8',
+  background: '#0f172a',
+  white: '#1e293b',
+  border: '#334155',
+  cardBg: '#1e293b',
+  slateBg: '#334155',
 };
 
 export default function AdminUsersScreen() {
@@ -28,6 +51,10 @@ export default function AdminUsersScreen() {
   const { users, isLoading, error, refresh, createUser, updateUser, deactivateUser, activateUser } = useAdminUsers();
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [form, setForm] = useState<CreateUserPayload>({ username: '', email: '', password: '', role: 'User' });
+  const { isDark } = useAppTheme();
+
+  const COLORS = isDark ? DARK_COLORS : LIGHT_COLORS;
+  const styles = getStyles(COLORS);
 
   // ── Kullanıcı Oluştur ──────────────────────────────────────────
   const handleCreate = async () => {
@@ -94,6 +121,7 @@ export default function AdminUsersScreen() {
 
   return (
     <View style={styles.container}>
+      <StatusBar barStyle={isDark ? "light-content" : "dark-content"} />
       <SafeAreaView style={{ flex: 1 }}>
         {/* Header */}
         <View style={styles.header}>
@@ -102,7 +130,7 @@ export default function AdminUsersScreen() {
           </TouchableOpacity>
           <Text style={styles.headerTitle}>Kullanıcı Yönetimi</Text>
           <TouchableOpacity style={styles.addBtn} onPress={() => setShowCreateModal(true)}>
-            <Ionicons name="add" size={22} color={COLORS.white} />
+            <Ionicons name="add" size={22} color={LIGHT_COLORS.white} />
           </TouchableOpacity>
         </View>
 
@@ -133,14 +161,14 @@ export default function AdminUsersScreen() {
                   <Text style={styles.userEmail}>{user.email}</Text>
                   <View style={styles.badges}>
                     {user.isSuperAdmin ? (
-                      <View style={[styles.badge, { backgroundColor: '#eef2ff', flexDirection: 'row', alignItems: 'center', gap: 4 }]}>
+                      <View style={[styles.badge, { backgroundColor: COLORS.primaryLight, flexDirection: 'row', alignItems: 'center', gap: 4 }]}>
                         <Text style={[styles.badgeText, { color: COLORS.primary }]}>
                           {user.role}
                         </Text>
                         <Ionicons name="lock-closed" size={11} color={COLORS.primary} />
                       </View>
                     ) : user.id.toString() === useAuthStore.getState().userId ? (
-                      <View style={[styles.badge, { backgroundColor: user.role === 'Admin' ? '#eef2ff' : '#f1f5f9', flexDirection: 'row', alignItems: 'center', gap: 4 }]}>
+                      <View style={[styles.badge, { backgroundColor: user.role === 'Admin' ? COLORS.primaryLight : COLORS.slateBg, flexDirection: 'row', alignItems: 'center', gap: 4 }]}>
                         <Text style={[styles.badgeText, { color: user.role === 'Admin' ? COLORS.primary : COLORS.slateLight }]}>
                           {user.role}
                         </Text>
@@ -148,7 +176,7 @@ export default function AdminUsersScreen() {
                       </View>
                     ) : (
                       <TouchableOpacity
-                        style={[styles.badge, { backgroundColor: user.role === 'Admin' ? '#eef2ff' : '#f1f5f9', flexDirection: 'row', alignItems: 'center', gap: 4 }]}
+                        style={[styles.badge, { backgroundColor: user.role === 'Admin' ? COLORS.primaryLight : COLORS.slateBg, flexDirection: 'row', alignItems: 'center', gap: 4 }]}
                         onPress={() => handleToggleRole(user)}
                       >
                         <Text style={[styles.badgeText, { color: user.role === 'Admin' ? COLORS.primary : COLORS.slateLight }]}>
@@ -185,11 +213,11 @@ export default function AdminUsersScreen() {
             <View style={styles.modalContent}>
               <Text style={styles.modalTitle}>Yeni Kullanıcı</Text>
 
-              <TextInput style={styles.input} placeholder="Kullanıcı adı" value={form.username}
+              <TextInput style={styles.input} placeholder="Kullanıcı adı" placeholderTextColor={COLORS.slateLight} value={form.username}
                 onChangeText={(v) => setForm({ ...form, username: v })} />
-              <TextInput style={styles.input} placeholder="E-posta" keyboardType="email-address" value={form.email}
+              <TextInput style={styles.input} placeholder="E-posta" placeholderTextColor={COLORS.slateLight} keyboardType="email-address" value={form.email}
                 onChangeText={(v) => setForm({ ...form, email: v })} />
-              <TextInput style={styles.input} placeholder="Şifre" secureTextEntry value={form.password}
+              <TextInput style={styles.input} placeholder="Şifre" placeholderTextColor={COLORS.slateLight} secureTextEntry value={form.password}
                 onChangeText={(v) => setForm({ ...form, password: v })} />
 
               {/* Rol seçimi */}
@@ -221,16 +249,16 @@ export default function AdminUsersScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const getStyles = (COLORS: any) => StyleSheet.create({
   container: { flex: 1, backgroundColor: COLORS.background },
   header: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 20, paddingTop: 16, paddingBottom: 12, gap: 12 },
-  backBtn: { width: 40, height: 40, borderRadius: 12, backgroundColor: COLORS.white, justifyContent: 'center', alignItems: 'center', elevation: 2, shadowColor: '#000', shadowOpacity: 0.05, shadowRadius: 4, shadowOffset: { width: 0, height: 2 } },
+  backBtn: { width: 40, height: 40, borderRadius: 12, backgroundColor: COLORS.cardBg, justifyContent: 'center', alignItems: 'center', elevation: 2, shadowColor: '#000', shadowOpacity: 0.05, shadowRadius: 4, shadowOffset: { width: 0, height: 2 } },
   headerTitle: { flex: 1, fontSize: 20, fontWeight: 'bold', color: COLORS.slate },
   addBtn: { width: 40, height: 40, borderRadius: 12, backgroundColor: COLORS.primary, justifyContent: 'center', alignItems: 'center' },
   errorBanner: { backgroundColor: COLORS.dangerLight, marginHorizontal: 20, borderRadius: 12, padding: 12, marginBottom: 8 },
   errorText: { color: COLORS.danger, fontSize: 13, textAlign: 'center' },
   listContent: { paddingHorizontal: 20, paddingBottom: 40 },
-  userCard: { flexDirection: 'row', alignItems: 'center', backgroundColor: COLORS.white, padding: 16, borderRadius: 16, marginBottom: 10, shadowColor: '#000', shadowOpacity: 0.03, shadowRadius: 6, shadowOffset: { width: 0, height: 2 }, elevation: 1 },
+  userCard: { flexDirection: 'row', alignItems: 'center', backgroundColor: COLORS.cardBg, padding: 16, borderRadius: 16, marginBottom: 10, shadowColor: '#000', shadowOpacity: 0.03, shadowRadius: 6, shadowOffset: { width: 0, height: 2 }, elevation: 1 },
   avatar: { width: 44, height: 44, borderRadius: 12, justifyContent: 'center', alignItems: 'center', marginRight: 14 },
   userInfo: { flex: 1 },
   userName: { fontSize: 15, fontWeight: '700', color: COLORS.slate },
@@ -240,18 +268,18 @@ const styles = StyleSheet.create({
   badgeText: { fontSize: 11, fontWeight: '700' },
   actionBtn: { width: 36, height: 36, borderRadius: 10, justifyContent: 'center', alignItems: 'center' },
   // Modal
-  modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.4)', justifyContent: 'flex-end' },
-  modalContent: { backgroundColor: COLORS.white, borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: 24, paddingBottom: 40 },
+  modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.6)', justifyContent: 'flex-end' },
+  modalContent: { backgroundColor: COLORS.cardBg, borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: 24, paddingBottom: 40 },
   modalTitle: { fontSize: 20, fontWeight: 'bold', color: COLORS.slate, marginBottom: 20 },
-  input: { backgroundColor: COLORS.background, borderRadius: 12, padding: 14, fontSize: 15, marginBottom: 12, borderWidth: 1, borderColor: '#e2e8f0' },
+  input: { backgroundColor: COLORS.background, color: COLORS.slate, borderRadius: 12, padding: 14, fontSize: 15, marginBottom: 12, borderWidth: 1, borderColor: COLORS.border },
   roleRow: { flexDirection: 'row', gap: 10, marginBottom: 20 },
-  roleBtn: { flex: 1, paddingVertical: 12, borderRadius: 12, backgroundColor: COLORS.background, alignItems: 'center', borderWidth: 1, borderColor: '#e2e8f0' },
+  roleBtn: { flex: 1, paddingVertical: 12, borderRadius: 12, backgroundColor: COLORS.background, alignItems: 'center', borderWidth: 1, borderColor: COLORS.border },
   roleBtnActive: { backgroundColor: COLORS.primary, borderColor: COLORS.primary },
   roleBtnText: { fontSize: 14, fontWeight: '600', color: COLORS.slateLight },
-  roleBtnTextActive: { color: COLORS.white },
+  roleBtnTextActive: { color: LIGHT_COLORS.white },
   modalActions: { flexDirection: 'row', gap: 12 },
   cancelBtn: { flex: 1, paddingVertical: 14, borderRadius: 12, backgroundColor: COLORS.background, alignItems: 'center' },
   cancelBtnText: { fontSize: 15, fontWeight: '600', color: COLORS.slateLight },
   submitBtn: { flex: 1, paddingVertical: 14, borderRadius: 12, backgroundColor: COLORS.primary, alignItems: 'center' },
-  submitBtnText: { fontSize: 15, fontWeight: '700', color: COLORS.white },
+  submitBtnText: { fontSize: 15, fontWeight: '700', color: LIGHT_COLORS.white },
 });
