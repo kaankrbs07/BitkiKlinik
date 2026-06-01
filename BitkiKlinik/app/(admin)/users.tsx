@@ -62,8 +62,8 @@ export default function AdminUsersScreen() {
 
   // ── Rol Değiştirme (Admin <-> User) ──────────────────────────────
   const handleToggleRole = (user: AdminUser) => {
-    if (user.id === 3) {
-      Alert.alert('Uyarı', 'Ana yönetici (ID: 3) hesabının rolü güvenlik nedeniyle değiştirilemez.');
+    if (user.isSuperAdmin) {
+      Alert.alert('Uyarı', 'Sistem bütünlüğü için yapılandırmada Super Admin hesaplarının rolü değiştirilemez.');
       return;
     }
     const currentUserId = useAuthStore.getState().userId;
@@ -132,7 +132,7 @@ export default function AdminUsersScreen() {
                   <Text style={styles.userName}>{user.username}</Text>
                   <Text style={styles.userEmail}>{user.email}</Text>
                   <View style={styles.badges}>
-                    {user.id === 3 ? (
+                    {user.isSuperAdmin ? (
                       <View style={[styles.badge, { backgroundColor: '#eef2ff', flexDirection: 'row', alignItems: 'center', gap: 4 }]}>
                         <Text style={[styles.badgeText, { color: COLORS.primary }]}>
                           {user.role}

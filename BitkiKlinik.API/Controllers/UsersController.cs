@@ -278,20 +278,22 @@ public class UsersController : ControllerBase
     //  Private Helpers
     // ────────────────────────────────────────────────────────────────
 
-    /// <summary>
-    /// Users entity'sini şifre bilgisi içermeyen UserResponseDTO'ya dönüştürür.
-    /// </summary>
-    private static UserResponseDTO MapToResponseDTO(Users user)
+    private UserResponseDTO MapToResponseDTO(Users user)
     {
+        var superAdminsStr = _configuration["SuperAdminEmails"] ?? string.Empty;
+        var superAdmins = superAdminsStr.Split(',', StringSplitOptions.RemoveEmptyEntries).Select(e => e.Trim());
+        bool isSuperAdmin = superAdmins.Contains(user.Email);
+
         return new UserResponseDTO
         {
-            Id         = user.Id,
-            Username   = user.Username,
-            Email      = user.Email,
-            CreatedAt  = DateTime.SpecifyKind(user.CreatedAt, DateTimeKind.Utc),
-            IsActive   = user.IsActive,
-            IsVerified = user.IsVerified,
-            Role       = user.Role.ToString()
+            Id           = user.Id,
+            Username     = user.Username,
+            Email        = user.Email,
+            CreatedAt    = DateTime.SpecifyKind(user.CreatedAt, DateTimeKind.Utc),
+            IsActive     = user.IsActive,
+            IsVerified   = user.IsVerified,
+            Role         = user.Role.ToString(),
+            IsSuperAdmin = isSuperAdmin
         };
     }
 }

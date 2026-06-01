@@ -11,6 +11,7 @@ export interface AdminUser {
   isActive: boolean;
   isVerified: boolean;
   role: string;
+  isSuperAdmin: boolean;
 }
 
 export interface CreateUserPayload {
