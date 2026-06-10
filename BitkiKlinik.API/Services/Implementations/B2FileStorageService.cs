@@ -1,6 +1,7 @@
 using Amazon.S3;
 using Amazon.S3.Model;
 using BitkiKlinik.API.Services.Interfaces;
+using BitkiKlinik.API.Services.Helpers;
 using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
@@ -79,7 +80,7 @@ public class B2FileStorageService : IFileStorageService
                 $"İzin verilenler: {string.Join(", ", _allowedExtensions)}");
 
         // Güvenlik: Magic Number doğrulaması (Gerçek dosya içeriği analizi)
-        LocalFileStorageService.ValidateImageSignature(file);
+        FileHelper.ValidateImageSignature(file);
     }
 
     /// <inheritdoc />

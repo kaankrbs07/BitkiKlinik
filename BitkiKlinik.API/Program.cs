@@ -10,10 +10,13 @@ using BitkiKlinik.API.Services.Interfaces;
 using BitkiKlinik.API.Services.Implementations;
 using Hangfire;
 using Hangfire.SqlServer;
+using Hangfire.Dashboard;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 using System.Text;
+using System.IdentityModel.Tokens.Jwt;
+using System.Security.Claims;
 using NLog;
 using NLog.Web;
 using BitkiKlinik.API.Middlewares;
@@ -250,11 +253,9 @@ app.UseCors("AllowAllOrigins");
 app.UseAuthentication();
 app.UseAuthorization();
 
-// ── Hangfire Dashboard (Yalnızca Admin) ───────────────────────────────────────
-// /hangfire endpoint'ine yalnızca Admin rolüyle erişilebilir.
 app.UseHangfireDashboard("/hangfire", new DashboardOptions
 {
-    Authorization = [new Hangfire.Dashboard.LocalRequestsOnlyAuthorizationFilter()],
+    Authorization = [new LocalOrDockerDashboardAuthorizationFilter()],
     DashboardTitle  = "BitkiKlinik Arka Plan İşleri"
 });
 
@@ -281,3 +282,39 @@ app.MapControllers();
 
 
 app.Run();
+
+public class LocalOrDockerDashboardAuthorizationFilter : Hangfire.Dashboard.IDashboardAuthorizationFilter
+{
+    public bool Authorize(Hangfire.Dashboard.DashboardContext context)
+    {
+        var httpContext = context.GetHttpContext();
+        var ip = httpContext.Connection.RemoteIpAddress;
+
+        // Diagnostik log: Hangfire'a gelen isteğin kaynak IP'sini görelim
+        var logger = httpContext.RequestServices.GetRequiredService<ILogger<LocalOrDockerDashboardAuthorizationFilter>>();
+        logger.LogInformation("Hangfire Dashboard erişim isteği. RemoteIP: {IP}, IsIPv4MappedToIPv6: {Mapped}",
+            ip?.ToString() ?? "null", ip?.IsIPv4MappedToIPv6);
+
+        if (ip == null) return false;
+
+        // Yerel loopback istekleri (localhost / 127.0.0.1 / ::1)
+        if (System.Net.IPAddress.IsLoopback(ip)) return true;
+
+        // IPv6-eşlemeli IPv4 adreslerini (::ffff:172.x.x.x) saf IPv4'e dönüştür
+        var checkIp = ip.IsIPv4MappedToIPv6 ? ip.MapToIPv4() : ip;
+        var ipBytes = checkIp.GetAddressBytes();
+
+        if (ipBytes.Length == 4)
+        {
+            // 10.x.x.x
+            if (ipBytes[0] == 10) return true;
+            // 172.16.0.0 - 172.31.255.255 (Docker varsayılan ağ bloğu)
+            if (ipBytes[0] == 172 && ipBytes[1] >= 16 && ipBytes[1] <= 31) return true;
+            // 192.168.x.x
+            if (ipBytes[0] == 192 && ipBytes[1] == 168) return true;
+        }
+
+        logger.LogWarning("Hangfire Dashboard erişimi reddedildi. IP: {IP}", checkIp);
+        return false;
+    }
+}

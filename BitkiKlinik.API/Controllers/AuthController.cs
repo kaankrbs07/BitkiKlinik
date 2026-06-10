@@ -1,6 +1,7 @@
 using BitkiKlinik.API.DTOs;
 using BitkiKlinik.API.Models;
 using BitkiKlinik.API.Services.Interfaces;
+using BitkiKlinik.API.Services.Helpers;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.RateLimiting;
 using System.Security.Cryptography;
@@ -59,7 +60,8 @@ public class AuthController : ControllerBase
             await _userService.UpdateAsync(createdUser);
 
             var subject = "Bitki Klinik - E-posta Doğrulama Kodu";
-            var message = $"Merhaba {createdUser.Username},<br><br>Kayıt işleminizi tamamlamak için doğrulama kodunuz: <b>{verificationCode}</b><br><br>Bu kod 15 dakika boyunca geçerlidir.";
+            var description = "Bitki Klinik'e başarıyla kaydoldunuz! Kayıt işleminizi tamamlamak ve hesabınızı aktifleştirmek için lütfen aşağıdaki doğrulama kodunu kullanın.";
+            var message = EmailTemplateHelper.GetVerificationEmailTemplate(createdUser.Username, subject, verificationCode, description);
             _emailService.SendEmailInBackground(createdUser.Email, subject, message);
 
             _logger.LogInformation("Yeni kullanıcı kaydı: {Username}", createdUser.Username);
@@ -113,7 +115,8 @@ public class AuthController : ControllerBase
             user.VerificationCodeExpiryTime = DateTime.UtcNow.AddMinutes(15);
 
             var subject = "Bitki Klinik - Giriş E-posta Doğrulama Kodu";
-            var message = $"Merhaba {user.Username},<br><br>Hesabınızı aktifleştirmek için doğrulama kodunuz: <b>{verificationCode}</b><br><br>Bu kod 15 dakika boyunca geçerlidir.";
+            var description = "Hesabınız henüz doğrulanmamış görünüyor. Giriş yapabilmek ve hesabınızı aktifleştirmek için lütfen aşağıdaki doğrulama kodunu kullanın.";
+            var message = EmailTemplateHelper.GetVerificationEmailTemplate(user.Username, subject, verificationCode, description);
             _emailService.SendEmailInBackground(user.Email, subject, message);
         }
 
@@ -213,7 +216,8 @@ public class AuthController : ControllerBase
         await _userService.UpdateAsync(user);
 
         var subject = "Bitki Klinik - Yeni E-posta Doğrulama Kodu";
-        var message = $"Merhaba {user.Username},<br><br>Hesabınızı aktifleştirmek için yeni doğrulama kodunuz: <b>{verificationCode}</b><br><br>Bu kod 15 dakika boyunca geçerlidir.";
+        var description = "Talebiniz üzerine yeni bir doğrulama kodu üretilmiştir. Hesabınızı aktifleştirmek için lütfen aşağıdaki güncel doğrulama kodunu kullanın.";
+        var message = EmailTemplateHelper.GetVerificationEmailTemplate(user.Username, subject, verificationCode, description);
         _emailService.SendEmailInBackground(user.Email, subject, message);
 
         _logger.LogInformation("Doğrulama kodu yeniden gönderildi. UserId: {UserId}", user.Id);
@@ -241,7 +245,8 @@ public class AuthController : ControllerBase
         await _userService.UpdateAsync(user);
 
         var subject = "Bitki Klinik - Şifre Sıfırlama Kodu";
-        var message = $"Merhaba {user.Username},<br><br>Şifrenizi yenilemek için doğrulama kodunuz: <b>{resetCode}</b><br><br>Bu kod 15 dakika boyunca geçerlidir.";
+        var description = "Hesabınız için şifre sıfırlama talebinde bulundunuz. Şifrenizi güvenli bir şekilde yenilemek için lütfen aşağıdaki doğrulama kodunu kullanın.";
+        var message = EmailTemplateHelper.GetVerificationEmailTemplate(user.Username, subject, resetCode, description);
         
         // Hangfire ile arka planda e-posta gönderimi
         _emailService.SendEmailInBackground(user.Email, subject, message);

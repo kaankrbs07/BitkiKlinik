@@ -4,6 +4,7 @@ using System.IO;
 using System.Text;
 using System.Threading.Tasks;
 using BitkiKlinik.API.Services.Implementations;
+using BitkiKlinik.API.Services.Helpers;
 using FluentAssertions;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Http;
@@ -64,7 +65,7 @@ public class FileStorageValidationTests
         var file = CreateMockFormFile(jpegBytes, "image.jpg");
 
         // Act & Assert
-        Action act = () => LocalFileStorageService.ValidateImageSignature(file);
+        Action act = () => FileHelper.ValidateImageSignature(file);
         act.Should().NotThrow();
     }
 
@@ -76,7 +77,7 @@ public class FileStorageValidationTests
         var file = CreateMockFormFile(pngBytes, "image.png");
 
         // Act & Assert
-        Action act = () => LocalFileStorageService.ValidateImageSignature(file);
+        Action act = () => FileHelper.ValidateImageSignature(file);
         act.Should().NotThrow();
     }
 
@@ -92,7 +93,7 @@ public class FileStorageValidationTests
         var file = CreateMockFormFile(webpBytes, "image.webp");
 
         // Act & Assert
-        Action act = () => LocalFileStorageService.ValidateImageSignature(file);
+        Action act = () => FileHelper.ValidateImageSignature(file);
         act.Should().NotThrow();
     }
 
@@ -104,7 +105,7 @@ public class FileStorageValidationTests
         var file = CreateMockFormFile(gifBytes, "image.gif");
 
         // Act & Assert
-        Action act = () => LocalFileStorageService.ValidateImageSignature(file);
+        Action act = () => FileHelper.ValidateImageSignature(file);
         act.Should().NotThrow();
     }
 
@@ -120,7 +121,7 @@ public class FileStorageValidationTests
         var file = CreateMockFormFile(riffAviBytes, "video.avi");
 
         // Act
-        Action act = () => LocalFileStorageService.ValidateImageSignature(file);
+        Action act = () => FileHelper.ValidateImageSignature(file);
 
         // Assert
         act.Should().Throw<ArgumentException>()
@@ -135,7 +136,7 @@ public class FileStorageValidationTests
         var file = CreateMockFormFile(shortBytes, "short.bin");
 
         // Act
-        Action act = () => LocalFileStorageService.ValidateImageSignature(file);
+        Action act = () => FileHelper.ValidateImageSignature(file);
 
         // Assert
         act.Should().Throw<ArgumentException>()
@@ -150,7 +151,7 @@ public class FileStorageValidationTests
         var file = CreateMockFormFile(textBytes, "shell.php.jpg");
 
         // Act
-        Action act = () => LocalFileStorageService.ValidateImageSignature(file);
+        Action act = () => FileHelper.ValidateImageSignature(file);
 
         // Assert
         act.Should().Throw<ArgumentException>()
@@ -165,7 +166,7 @@ public class FileStorageValidationTests
         var file = CreateMockFormFile(emptyBytes, "empty.jpg");
 
         // Act
-        Action act = () => LocalFileStorageService.ValidateImageSignature(file);
+        Action act = () => FileHelper.ValidateImageSignature(file);
 
         // Assert
         act.Should().Throw<ArgumentException>()
