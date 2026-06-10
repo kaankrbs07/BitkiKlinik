@@ -57,6 +57,9 @@ public class RetrainHistoryDTO
     public int TotalSamples { get; set; }
     public int AlSamples { get; set; }
     public int BufferSamples { get; set; }
+    public string? TriggeredBy { get; set; }
+    public DateTime? StartedAt { get; set; }
+    public double? DurationSeconds { get; set; }
 }
 
 public class ActiveLearningClassDistributionDTO

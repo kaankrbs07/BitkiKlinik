@@ -238,7 +238,7 @@ public class ActiveLearningService : IActiveLearningService
         return true;
     }
 
-    public async Task<RetrainResponseDTO> TriggerRetrainAsync()
+    public async Task<RetrainResponseDTO> TriggerRetrainAsync(string? triggeredBy = null)
     {
         try
         {
@@ -286,7 +286,7 @@ public class ActiveLearningService : IActiveLearningService
                 var isHealthy = await _retrainQueueService.IsHealthyAsync();
                 if (isHealthy)
                 {
-                    var published = await _retrainQueueService.PublishRetrainJobAsync();
+                    var published = await _retrainQueueService.PublishRetrainJobAsync(triggeredBy);
                     if (published)
                     {
                         _logger.LogInformation("Yeniden eğitim işi RabbitMQ kuyruğuna eklendi: {Queue}", "bitkiklinik.retrain");
@@ -302,8 +302,9 @@ public class ActiveLearningService : IActiveLearningService
 
             // Fallback: Doğrudan Python FastAPI'ye HTTP isteği at
             var retrainEndpoint = _configuration["PythonApi:RetrainEndpoint"] ?? "/active-learning/retrain";
+            var urlWithParam = $"{retrainEndpoint}?triggeredBy={Uri.EscapeDataString(triggeredBy ?? "system")}";
             
-            var response = await client.PostAsync(retrainEndpoint, null);
+            var response = await client.PostAsync(urlWithParam, null);
 
             if (response.IsSuccessStatusCode)
             {
@@ -425,7 +426,40 @@ public class ActiveLearningService : IActiveLearningService
         _logger.LogInformation("Yeni eğitilen yapay zeka model dosyaları Backblaze B2 bulut sunucusuna yedekleniyor...");
         var client = _httpClientFactory.CreateClient("PythonApiClient");
         var filesToBackup = new[] { "efficientnet_b0_plant.pt", "efficientnet_b0_plant.quant.pt", "class_map.json" };
-        
+
+        // ── 1. Mevcut models/latest/ dosyalarını arşive taşı ─────────────────
+        // Her başarılı retrain öncesinde eski model tarih damgalı bir klasöre
+        // kopyalanır → tam geri alma (rollback) imkânı sağlar.
+        var archiveTimestamp = DateTime.UtcNow.ToString("yyyy-MM-ddTHH-mm-ss") + "Z";
+        var archiveSubDir    = $"models/archive/{archiveTimestamp}";
+        int archivedCount    = 0;
+
+        foreach (var fileName in filesToBackup)
+        {
+            try
+            {
+                var existingBytes = await _fileStorageService.GetFileBytesAsync($"models/latest/{fileName}");
+                if (existingBytes != null)
+                {
+                    await _fileStorageService.SaveFileBytesAsync(existingBytes, fileName, archiveSubDir);
+                    archivedCount++;
+                }
+            }
+            catch (Exception ex)
+            {
+                // Arşivleme hatası yedeklemeyi durdurmamalı; yalnızca logla
+                _logger.LogWarning(ex, "Eski model arşivlenirken hata oluştu: {File}", fileName);
+            }
+        }
+
+        if (archivedCount > 0)
+            _logger.LogInformation(
+                "Eski model {Count} dosya Backblaze B2 arşivine kopyalandı: {Dir}",
+                archivedCount, archiveSubDir);
+        else
+            _logger.LogInformation("Backblaze'de arşivlenecek önceki model dosyası bulunamadı (ilk eğitim olabilir).");
+
+        // ── 2. Yeni modeli models/latest/ üzerine yaz ────────────────────────
         foreach (var fileName in filesToBackup)
         {
             try
@@ -435,13 +469,14 @@ public class ActiveLearningService : IActiveLearningService
                 if (response.IsSuccessStatusCode)
                 {
                     var fileBytes = await response.Content.ReadAsByteArrayAsync();
-                    // Buluta "models/latest" alt klasörü altında kaydederiz
                     await _fileStorageService.SaveFileBytesAsync(fileBytes, fileName, "models/latest");
-                    _logger.LogInformation("Model dosyası başarıyla Backblaze B2'ye yedeklendi: {File}", fileName);
+                    _logger.LogInformation("Model dosyası başarıyla Backblaze B2 models/latest'e kaydedildi: {File}", fileName);
                 }
                 else
                 {
-                    _logger.LogWarning("Model dosyası indirilemediği için yedeklenemedi: {File}. Durum: {Status}", fileName, response.StatusCode);
+                    _logger.LogWarning(
+                        "Model dosyası indirilemediği için yedeklenemedi: {File}. Durum: {Status}",
+                        fileName, response.StatusCode);
                 }
             }
             catch (Exception ex)

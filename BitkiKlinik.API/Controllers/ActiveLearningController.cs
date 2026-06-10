@@ -59,7 +59,8 @@ public class ActiveLearningController : ControllerBase
     [HttpPost("retrain")]
     public async Task<IActionResult> TriggerRetrain()
     {
-        var result = await _activeLearningService.TriggerRetrainAsync();
+        var username = User.Identity?.Name ?? User.FindFirst(System.Security.Claims.ClaimTypes.Name)?.Value ?? "system";
+        var result = await _activeLearningService.TriggerRetrainAsync(username);
         return Ok(result);
     }
 

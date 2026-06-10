@@ -17,6 +17,7 @@ import io
 import json
 import logging
 import os
+import shutil
 import threading
 import uuid
 import datetime
@@ -399,7 +400,7 @@ def add_sample(file: UploadFile = File(...), label: str = Form(...)):
 
 
 @app.post("/active-learning/retrain")
-async def retrain():
+async def retrain(triggeredBy: str = "system"):
     """
     Arka planda modeli aktif öğrenme verileriyle yeniden eğitmeyi tetikler.
 
@@ -418,7 +419,7 @@ async def retrain():
             training_error=None
         )
 
-    def _blocking_train() -> None:
+    def _blocking_train(t_by: str) -> None:
         """Thread-pool'da çalışan senkron eğitim fonksiyonu."""
         try:
             from retrain import retrain_model
@@ -432,7 +433,7 @@ async def retrain():
                 )
 
             logger.info("Aktif öğrenme yeniden eğitimi thread-pool'da başlatılıyor...")
-            num_samples = retrain_model(progress_callback=progress_cb)
+            num_samples = retrain_model(progress_callback=progress_cb, triggered_by=t_by)
             logger.info("Yeniden eğitim tamamlandı! Toplam %d örnek kullanıldı.", num_samples)
 
             # Modeli sıcak yükleme (hot reload) — model_lock zaten load_model içinde
@@ -440,21 +441,48 @@ async def retrain():
             load_model()
             logger.info("Model başarıyla sıcak-yüklendi!")
 
-            # Eğitilen dosya listesini güncelle
-            all_files = []
-            data_dir = Path("data/active_learning")
+            # ── active_learning → memory_buffer'a taşı, ardından temizle ──────
+            # Retrain başarılı bitti; admin onaylı görseller artık memory_buffer'a
+            # alınır. Böylece sonraki retrain temiz başlar, buffer ise büyümeye devam
+            # eder (katastrofik unutmayı önleme stratejisi).
+            moved_count = 0
+            data_dir   = Path("data/active_learning")
+            buffer_dir = Path("data/memory_buffer")
+
             if data_dir.exists():
                 for label in os.listdir(data_dir):
                     label_dir = data_dir / label
-                    if label_dir.is_dir():
-                        for f in os.listdir(label_dir):
-                            if f.lower().endswith((".png", ".jpg", ".jpeg", ".webp")):
-                                all_files.append((label_dir / f).as_posix())
+                    if not label_dir.is_dir():
+                        continue
+                    target_dir = buffer_dir / label
+                    target_dir.mkdir(parents=True, exist_ok=True)
+                    for f in os.listdir(label_dir):
+                        if not f.lower().endswith((".png", ".jpg", ".jpeg", ".webp")):
+                            continue
+                        src = label_dir / f
+                        dst = target_dir / f
+                        # Hedefte aynı isimde dosya varsa çakışmayı önle
+                        if dst.exists():
+                            stem, suffix = src.stem, src.suffix
+                            dst = target_dir / f"{stem}_{uuid.uuid4().hex[:8]}{suffix}"
+                        shutil.move(str(src), str(dst))
+                        moved_count += 1
+
+                # active_learning alt klasörlerini temizle (ana klasörü bırak)
+                for item in data_dir.iterdir():
+                    if item.is_dir():
+                        shutil.rmtree(item)
+
+                logger.info(
+                    "Aktif öğrenme görselleri memory buffer'a taşındı: %d dosya. "
+                    "data/active_learning temizlendi.", moved_count
+                )
 
             with state_lock:
-                state["trained_files"]   = all_files
+                # active_learning temizlendiği için trained_files sıfırlanır
+                state["trained_files"]   = []
                 state["last_trained_at"] = datetime.datetime.now(datetime.timezone.utc).isoformat()
-            save_active_learning_meta(all_files)
+            save_active_learning_meta([])
 
             with state_lock:
                 state.update(
@@ -485,7 +513,7 @@ async def retrain():
 
     # asyncio.to_thread: bloklayan _blocking_train'i thread-pool executor'a taşır.
     # Event loop serbest kalır — GIL paylaşımı için time.sleep() gerekmiyor.
-    asyncio.ensure_future(asyncio.to_thread(_blocking_train))
+    asyncio.ensure_future(asyncio.to_thread(_blocking_train, triggeredBy))
 
     return JSONResponse(content={"message": "Yeniden eğitim arka planda başlatıldı."})
 

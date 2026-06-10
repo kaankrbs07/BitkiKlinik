@@ -22,9 +22,11 @@ Bağımlılıklar (requirements.txt'e eklenmiş):
 import json
 import logging
 import os
+import shutil
 import signal
 import sys
 import threading
+import uuid
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -74,7 +76,7 @@ def write_state(state: dict) -> None:
 # ─────────────────────────────────────────────
 #  ÇEKIRDEK: EĞİTİM FONKSIYONU
 # ─────────────────────────────────────────────
-def run_retrain() -> None:
+def run_retrain(triggered_by: str = "system") -> None:
     """retrain.py'deki retrain_model() fonksiyonunu çalıştırır ve durumu günceller."""
 
     # Durum: Eğitim başlıyor
@@ -84,6 +86,7 @@ def run_retrain() -> None:
         "error"        : None,
         "lastTrainedAt": None,
         "startedAt"    : datetime.now(timezone.utc).isoformat(),
+        "triggeredBy"  : triggered_by
     })
 
     try:
@@ -99,6 +102,7 @@ def run_retrain() -> None:
                 "lastTrainedAt": None,
                 "currentEpoch" : epoch,
                 "totalEpochs"  : num_epochs,
+                "triggeredBy"  : triggered_by
             })
             logger.info(
                 "Epoch %d/%d | Train Loss: %.4f | Train Acc: %.4f | Val Loss: %.4f | Val Acc: %.4f",
@@ -106,7 +110,7 @@ def run_retrain() -> None:
             )
 
         logger.info("Yeniden eğitim başlatılıyor...")
-        num_samples = retrain_model(progress_callback=progress_cb)
+        num_samples = retrain_model(progress_callback=progress_cb, triggered_by=triggered_by)
         logger.info("Yeniden eğitim tamamlandı. Kullanılan örnek: %d", num_samples)
 
         # Durum: Eğitim başarılı
@@ -117,6 +121,43 @@ def run_retrain() -> None:
             "lastTrainedAt": datetime.now(timezone.utc).isoformat(),
             "totalSamples" : num_samples,
         })
+
+        # ── active_learning → memory_buffer'a taşı, ardından temizle ────────────
+        # Retrain başarılı bitti; admin onaylı görseller artık memory_buffer'a
+        # alınır. Böylece sonraki retrain temiz başlar, buffer ise büyümeye devam
+        # eder (katastrofik unutmayı önleme stratejisi).
+        moved_count = 0
+        data_dir   = Path("data/active_learning")
+        buffer_dir = Path("data/memory_buffer")
+
+        if data_dir.exists():
+            for label in os.listdir(data_dir):
+                label_dir = data_dir / label
+                if not label_dir.is_dir():
+                    continue
+                target_dir = buffer_dir / label
+                target_dir.mkdir(parents=True, exist_ok=True)
+                for f in os.listdir(label_dir):
+                    if not f.lower().endswith((".png", ".jpg", ".jpeg", ".webp")):
+                        continue
+                    src = label_dir / f
+                    dst = target_dir / f
+                    # Hedefte aynı isimde dosya varsa çakışmayı önle
+                    if dst.exists():
+                        stem, suffix = src.stem, src.suffix
+                        dst = target_dir / f"{stem}_{uuid.uuid4().hex[:8]}{suffix}"
+                    shutil.move(str(src), str(dst))
+                    moved_count += 1
+
+            # active_learning alt klasörlerini temizle (ana klasörü bırak)
+            for item in data_dir.iterdir():
+                if item.is_dir():
+                    shutil.rmtree(item)
+
+            logger.info(
+                "Aktif öğrenme görselleri memory buffer'a taşındı: %d dosya. "
+                "data/active_learning temizlendi.", moved_count
+            )
 
         # C# API Webhook bildirimi göndererek yeni model dosyalarının Backblaze B2'ye yedeklenmesini tetikle
         try:
@@ -152,14 +193,17 @@ def run_retrain() -> None:
 # ─────────────────────────────────────────────
 def on_message(channel, method, _properties, body):
     """Kuyruktan gelen mesajı işler."""
+    triggered_by = "system"
     try:
         payload = json.loads(body.decode("utf-8"))
         logger.info("Kuyruktan yeniden eğitim mesajı alındı: %s", payload)
+        if isinstance(payload, dict):
+            triggered_by = payload.get("triggeredBy", "system")
     except Exception:
         logger.warning("Mesaj parse edilemedi, yine de işleniyor.")
 
     # Eğitimi ana thread'de çalıştır (pika consumer thread'i bloklar, bu kasıtlı)
-    run_retrain()
+    run_retrain(triggered_by=triggered_by)
 
     # Mesajı başarıyla işlenmiş olarak onayla
     channel.basic_ack(delivery_tag=method.delivery_tag)
@@ -173,6 +217,7 @@ def start_worker() -> None:
     logger.info("RabbitMQ URL: %s", RABBITMQ_URL.replace(":guest@", ":***@"))
 
     params     = pika.URLParameters(RABBITMQ_URL)
+    params.heartbeat = 0
     connection = pika.BlockingConnection(params)
     channel    = connection.channel()
 

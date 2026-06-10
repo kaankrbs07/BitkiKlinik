@@ -66,6 +66,9 @@ interface RetrainHistoryItem {
   totalSamples: number;
   alSamples: number;
   bufferSamples: number;
+  triggeredBy?: string;
+  startedAt?: string;
+  durationSeconds?: number;
 }
 
 interface ClassDistributionItem {
@@ -312,6 +315,34 @@ export default function MLOpsDashboardScreen() {
                       <Text style={s.sampleBoxNum}>{selectedRun.totalSamples}</Text>
                       <Text style={s.sampleBoxLabel}>Toplam Örnek</Text>
                     </View>
+                  </View>
+
+                  <View style={s.runMetaBox}>
+                    <View style={s.metaRow}>
+                      <View style={s.metaCol}>
+                        <Ionicons name="person-outline" size={14} color={colors.slateLight} />
+                        <Text style={s.metaLabel}>Tetikleyen: </Text>
+                        <Text style={s.metaValText}>{selectedRun.triggeredBy || 'Sistem'}</Text>
+                      </View>
+                      <View style={s.metaCol}>
+                        <Ionicons name="time-outline" size={14} color={colors.slateLight} />
+                        <Text style={s.metaLabel}>Süre: </Text>
+                        <Text style={s.metaValText}>
+                          {selectedRun.durationSeconds != null
+                            ? `${Math.round(selectedRun.durationSeconds)} sn`
+                            : 'Bilinmiyor'}
+                        </Text>
+                      </View>
+                    </View>
+                    {selectedRun.startedAt && (
+                      <View style={[s.metaRow, { marginTop: 8 }]}>
+                        <View style={s.metaCol}>
+                          <Ionicons name="calendar-outline" size={14} color={colors.slateLight} />
+                          <Text style={s.metaLabel}>Başlangıç: </Text>
+                          <Text style={s.metaValText}>{formatDate(selectedRun.startedAt)}</Text>
+                        </View>
+                      </View>
+                    )}
                   </View>
                 </Animated.View>
               )}
@@ -607,6 +638,33 @@ const getStyles = (colors: typeof LIGHT_COLORS) => StyleSheet.create({
   sampleBoxNum: { fontSize: 16, fontWeight: 'bold', color: colors.slate },
   sampleBoxLabel: { fontSize: 10, color: colors.slateLight, fontWeight: '700', marginTop: 2 },
   sampleBoxDivider: { width: 1, height: 24, backgroundColor: colors.border },
+  runMetaBox: {
+    marginTop: 12,
+    borderTopWidth: 1,
+    borderTopColor: colors.border,
+    paddingTop: 12,
+    gap: 8,
+  },
+  metaRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  metaCol: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
+  metaLabel: {
+    fontSize: 11,
+    color: colors.slateLight,
+    fontWeight: '600',
+  },
+  metaValText: {
+    fontSize: 11,
+    color: colors.slate,
+    fontWeight: 'bold',
+  },
 
   // Dağılım Kartı
   distributionCard: {

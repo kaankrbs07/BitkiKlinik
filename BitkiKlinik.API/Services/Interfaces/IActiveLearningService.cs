@@ -11,7 +11,7 @@ public interface IActiveLearningService
     Task<bool> ResolveAsync(int queueId, string correctedDisease);
     Task<bool> IgnoreAsync(int queueId);
     Task<bool> FlagScanAsync(int scanId);
-    Task<RetrainResponseDTO> TriggerRetrainAsync();
+    Task<RetrainResponseDTO> TriggerRetrainAsync(string? triggeredBy = null);
     Task<RetrainStatusDTO?> GetRetrainStatusAsync();
     Task<List<RetrainHistoryDTO>?> GetRetrainHistoryAsync();
     Task<List<ActiveLearningClassDistributionDTO>> GetClassDistributionAsync();

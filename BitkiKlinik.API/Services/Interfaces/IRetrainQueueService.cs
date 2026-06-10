@@ -10,9 +10,9 @@ public interface IRetrainQueueService
     /// <summary>
     /// Yeniden eğitim işini kuyruğa ekler.
     /// </summary>
-    /// <param name="triggeredByAdminId">İşlemi tetikleyen admin kullanıcısının ID'si (loglama için).</param>
+    /// <param name="triggeredBy">İşlemi tetikleyen admin kullanıcısının adı (loglama için).</param>
     /// <returns>Kuyruk mesajı başarıyla yayınlandıysa true.</returns>
-    Task<bool> PublishRetrainJobAsync(int? triggeredByAdminId = null);
+    Task<bool> PublishRetrainJobAsync(string? triggeredBy = null);
 
     /// <summary>
     /// Kuyruk servisinin sağlık durumunu döndürür.

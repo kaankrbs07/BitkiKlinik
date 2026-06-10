@@ -8,6 +8,8 @@ from torch.utils.data import DataLoader, Dataset
 from PIL import Image
 import torchvision.models as models
 from torchvision import transforms
+import datetime
+import time
 
 # ─────────────────────────────────────────────
 #  DATASET SINIFI
@@ -63,7 +65,7 @@ def _collect_samples(directory: str, class_to_idx: dict) -> tuple[list, set]:
 # ─────────────────────────────────────────────
 #  ANA EĞİTİM FONKSİYONU
 # ─────────────────────────────────────────────
-def retrain_model(progress_callback=None):
+def retrain_model(progress_callback=None, triggered_by="system"):
     """
     Aktif öğrenme + memory buffer ile modeli yeniden eğitir.
 
@@ -84,6 +86,9 @@ def retrain_model(progress_callback=None):
                                    300 görsel (offline augmentation dahil)
        Memory buffer yoksa sadece active_learning verisiyle devam edilir.
     """
+    
+    start_time = time.time()
+    started_at = datetime.datetime.now(datetime.timezone.utc).isoformat()
 
     # ── Yollar ──────────────────────────────────────────────────────────────
     active_dir  = "data/active_learning"
@@ -317,7 +322,6 @@ def retrain_model(progress_callback=None):
 
     # ── 12. Tarihsel Eğitim Metriklerini Kaydet ──────────────────────────────
     try:
-        import datetime
         history_path = os.path.join("outputs", "retrain_history.json")
         history_data = []
         if os.path.exists(history_path):
@@ -327,6 +331,9 @@ def retrain_model(progress_callback=None):
         # Yeni eğitim kaydı
         new_entry = {
             "trainedAt": datetime.datetime.now(datetime.timezone.utc).isoformat(),
+            "startedAt": started_at,
+            "durationSeconds": round(time.time() - start_time, 2),
+            "triggeredBy": triggered_by,
             "epochs": epochs,
             "trainLoss": round(train_loss, 4),
             "trainAcc": round(train_acc, 4),

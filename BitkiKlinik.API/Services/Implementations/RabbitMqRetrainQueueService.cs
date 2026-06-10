@@ -70,7 +70,7 @@ public sealed class RabbitMqRetrainQueueService : IRetrainQueueService, IAsyncDi
     }
 
     // ── Ana yayınlama metodu ──────────────────────────────────────────────────
-    public async Task<bool> PublishRetrainJobAsync(int? triggeredByAdminId = null)
+    public async Task<bool> PublishRetrainJobAsync(string? triggeredBy = null)
     {
         try
         {
@@ -78,9 +78,9 @@ public sealed class RabbitMqRetrainQueueService : IRetrainQueueService, IAsyncDi
 
             var payload = new
             {
-                jobType          = "retrain",
-                triggeredAt      = DateTime.UtcNow,
-                triggeredByAdmin = triggeredByAdminId
+                jobType     = "retrain",
+                triggeredAt = DateTime.UtcNow,
+                triggeredBy = triggeredBy ?? "system"
             };
 
             var bodyBytes = Encoding.UTF8.GetBytes(JsonSerializer.Serialize(payload));
@@ -100,8 +100,8 @@ public sealed class RabbitMqRetrainQueueService : IRetrainQueueService, IAsyncDi
                 body:        bodyBytes);
 
             _logger.LogInformation(
-                "Yeniden eğitim işi kuyruğa eklendi. Kuyruk: {Queue}, TriggeredBy: {AdminId}",
-                QueueName, triggeredByAdminId?.ToString() ?? "system");
+                "Yeniden eğitim işi kuyruğa eklendi. Kuyruk: {Queue}, TriggeredBy: {TriggeredBy}",
+                QueueName, triggeredBy ?? "system");
 
             return true;
         }
