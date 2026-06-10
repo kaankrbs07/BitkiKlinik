@@ -3,6 +3,7 @@ using System.Threading.RateLimiting;
 using BitkiKlinik.API.Configuration;
 using BitkiKlinik.API.Data;
 using BitkiKlinik.API.HostedServices;
+using BitkiKlinik.API.Interceptors;
 using BitkiKlinik.API.Jobs;
 using BitkiKlinik.API.Services;
 using BitkiKlinik.API.Services.Interfaces;
@@ -26,8 +27,18 @@ builder.Host.UseNLog();
 
 // Add services to the container.
 builder.Services.AddMemoryCache();
-builder.Services.AddDbContext<ApplicationDbContext>(options =>
-    options.UseSqlServer(builder.Configuration.GetConnectionString("DefaultConnection")));
+
+// ── Audit Log Altyapısı ───────────────────────────────────────────
+// IHttpContextAccessor: Interceptor içinden JWT token'dan UserId okumak için gereklidir.
+// AuditLogInterceptor Singleton: durum taşımıyor, UserId her çaırıda HttpContext'ten çözülüyor.
+builder.Services.AddHttpContextAccessor();
+builder.Services.AddSingleton<AuditLogInterceptor>();
+
+builder.Services.AddDbContext<ApplicationDbContext>((serviceProvider, options) =>
+{
+    options.UseSqlServer(builder.Configuration.GetConnectionString("DefaultConnection"));
+    options.AddInterceptors(serviceProvider.GetRequiredService<AuditLogInterceptor>());
+});
 
 
 // Named HttpClient: PlantAnalysisService tarafından IHttpClientFactory aracılığıyla kullanılır

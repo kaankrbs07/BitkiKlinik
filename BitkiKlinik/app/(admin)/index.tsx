@@ -114,6 +114,15 @@ export default function AdminDashboardScreen() {
       bgColor: isDark ? '#1e3a8a' : '#eff6ff',
       route: '/(admin)/mlops',
     },
+    {
+      id: 'audit-logs',
+      title: 'Sistem Günlükleri',
+      subtitle: 'Kritik işlemleri ve veri değişimlerini izle',
+      icon: 'shield-checkmark' as any,
+      color: isDark ? '#2dd4bf' : '#0d9488',
+      bgColor: isDark ? '#134e4a' : '#f0fdfa',
+      route: '/(admin)/audit-logs',
+    },
   ];
 
   return (

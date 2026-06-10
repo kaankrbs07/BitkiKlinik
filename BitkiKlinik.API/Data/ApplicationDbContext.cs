@@ -16,6 +16,7 @@ public class ApplicationDbContext : DbContext
     public DbSet<ActiveLearningQueue> ActiveLearningQueue { get; set; } = null!;
     public DbSet<ChatMessage> ChatMessages { get; set; } = null!;
     public DbSet<DiseaseRiskAlert> DiseaseRiskAlerts { get; set; } = null!;
+    public DbSet<AuditLog> AuditLogs { get; set; } = null!;
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -29,6 +30,35 @@ public class ApplicationDbContext : DbContext
         modelBuilder.Entity<PlantScan>().ToTable("PlantScans");
         modelBuilder.Entity<ActiveLearningQueue>().ToTable("ActiveLearningQueue");
         modelBuilder.Entity<DiseaseRiskAlert>().ToTable("DiseaseRiskAlerts");
+
+        // ── AuditLog configuration ───────────────────────────────────────────
+        modelBuilder.Entity<AuditLog>(entity =>
+        {
+            entity.ToTable("AuditLogs");
+            entity.HasKey(a => a.Id);
+
+            entity.Property(a => a.UserId)
+                  .IsRequired()
+                  .HasMaxLength(50);
+
+            entity.Property(a => a.TableName)
+                  .IsRequired()
+                  .HasMaxLength(100);
+
+            entity.Property(a => a.EntityId)
+                  .IsRequired()
+                  .HasMaxLength(200);
+
+            entity.Property(a => a.Action)
+                  .HasConversion<int>()
+                  .IsRequired();
+
+            // Admin paneli filtreleme sorgularını hızlandırmak için index'ler
+            entity.HasIndex(a => a.Timestamp);          // Tarih filtresi
+            entity.HasIndex(a => a.UserId);             // Kullanıcı filtresi
+            entity.HasIndex(a => a.TableName);          // Tablo filtresi
+            entity.HasIndex(a => a.Action);             // İşlem türü filtresi
+        });
 
         // ── Treatment: store TreatmentType enum as an integer column ─────────
         modelBuilder.Entity<Treatment>(entity =>

@@ -43,6 +43,7 @@ export default function AdminLayout() {
       <Stack.Screen name="hangfire" />
       <Stack.Screen name="rabbitmq" />
       <Stack.Screen name="mlops" />
+      <Stack.Screen name="audit-logs" />
     </Stack>
   );
 }
