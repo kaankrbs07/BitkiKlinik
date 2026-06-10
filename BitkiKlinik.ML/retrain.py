@@ -110,17 +110,10 @@ def retrain_model(progress_callback=None, triggered_by="system"):
 
 
 
-    # Memory buffer olmadığında minimum örnek kontrolü
+    # Memory buffer var mı kontrolü
     has_buffer = os.path.exists(buffer_dir) and any(
         os.scandir(buffer_dir)
     )
-    MIN_AL_SAMPLES = 5 if has_buffer else 10
-    if len(al_samples) < MIN_AL_SAMPLES:
-        raise ValueError(
-            f"Yetersiz aktif öğrenme verisi: {len(al_samples)} görsel mevcut, "
-            f"en az {MIN_AL_SAMPLES} doğrulanmış görsel gereklidir. "
-            f"({MIN_AL_SAMPLES - len(al_samples)} görsel daha gerekiyor)"
-        )
 
     print(f"Aktif öğrenme: {len(al_samples)} görsel, {len(active_class_indices)} sınıf")
     print(f"Aktif sınıflar: {sorted(active_class_indices)}")
