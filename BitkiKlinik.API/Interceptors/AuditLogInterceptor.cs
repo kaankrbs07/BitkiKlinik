@@ -32,8 +32,8 @@ public sealed class AuditLogInterceptor : SaveChangesInterceptor
     private static readonly HashSet<string> _auditedEntities = new(StringComparer.OrdinalIgnoreCase)
     {
         "Users",
-        "Disease",
-        "Treatment"
+        "Diseases",
+        "Treatments"
     };
 
     /// <summary>
