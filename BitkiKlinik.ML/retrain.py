@@ -118,7 +118,7 @@ def retrain_model(progress_callback=None, triggered_by="system"):
     has_buffer = os.path.exists(buffer_dir) and any(
         os.scandir(buffer_dir)
     )
-    MIN_AL_SAMPLES = 5 if has_buffer else 30
+    MIN_AL_SAMPLES = 5 if has_buffer else 10
     if len(al_samples) < MIN_AL_SAMPLES:
         raise ValueError(
             f"Yetersiz aktif öğrenme verisi: {len(al_samples)} görsel mevcut, "

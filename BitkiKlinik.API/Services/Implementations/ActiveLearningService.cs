@@ -227,10 +227,13 @@ public class ActiveLearningService : IActiveLearningService
             return true;
         }
 
+        var disease = await _context.Diseases.FirstOrDefaultAsync(d => d.Name == scan.DiseaseName);
+        var modelLabel = disease != null ? disease.ModelLabel : scan.DiseaseName;
+
         await EnqueueAsync(
             scanId: scan.Id,
             imagePath: scan.ImageUrl ?? string.Empty,
-            predictedDisease: scan.DiseaseName,
+            predictedDisease: modelLabel,
             confidence: scan.Confidence,
             source: ActiveLearningSource.UserFlagged
         );
@@ -256,7 +259,7 @@ public class ActiveLearningService : IActiveLearningService
                     var statusDoc  = System.Text.Json.JsonDocument.Parse(statusJson);
                     var totalSamples = statusDoc.RootElement.GetProperty("totalSamples").GetInt32();
 
-                    const int MinSamplesRequired = 30;
+                    const int MinSamplesRequired = 10;
                     if (totalSamples < MinSamplesRequired)
                     {
                         _logger.LogWarning(

@@ -74,7 +74,7 @@ public class ScanOrchestrationService : IScanOrchestrationService
                 await _activeLearningService.EnqueueAsync(
                     scanId          : plantScan.Id,
                     imagePath       : plantScan.ImageUrl ?? string.Empty,
-                    predictedDisease: plantScan.DiseaseName,
+                    predictedDisease: analysisResult.ModelLabel,
                     confidence      : plantScan.Confidence,
                     source          : ActiveLearningSource.LowConfidence
                 );

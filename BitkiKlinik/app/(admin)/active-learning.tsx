@@ -97,7 +97,7 @@ export default function ActiveLearningScreen() {
   const [isResolving, setIsResolving] = useState(false);
 
   // Minimum örnek sayısı eşiği
-  const MIN_SAMPLES_REQUIRED = 30;
+  const MIN_SAMPLES_REQUIRED = 10;
 
   // Yeniden eğitimi tetikle
   const handleRetrain = () => {
@@ -350,10 +350,6 @@ export default function ActiveLearningScreen() {
               {/* Model Bilgileri */}
               <View style={s.panelFooter}>
                 <View style={{ flexDirection: 'column', gap: 6 }}>
-                  <View style={s.footerInfo}>
-                    <Ionicons name="sparkles-outline" size={15} color={C.emerald} />
-                    <Text style={s.footerInfoTxt}>Yeni Görsel: {retrainStatus.currentSamples}</Text>
-                  </View>
                   <View style={s.footerInfo}>
                     <Ionicons name="images-outline" size={15} color={C.slateLight} />
                     <Text style={s.footerInfoTxt}>Toplam Görsel: {retrainStatus.totalSamples}</Text>
