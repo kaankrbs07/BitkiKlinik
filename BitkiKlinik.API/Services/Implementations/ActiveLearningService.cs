@@ -434,6 +434,24 @@ public class ActiveLearningService : IActiveLearningService
         // Her başarılı retrain öncesinde eski model tarih damgalı bir klasöre
         // kopyalanır → tam geri alma (rollback) imkânı sağlar.
         var archiveTimestamp = DateTime.UtcNow.ToString("yyyy-MM-ddTHH-mm-ss") + "Z";
+        try
+        {
+            var history = await GetRetrainHistoryAsync();
+            if (history != null && history.Any())
+            {
+                var latest = history.OrderByDescending(h => h.TrainedAt).First();
+                if (latest.StartedAt.HasValue)
+                {
+                    archiveTimestamp = latest.StartedAt.Value.ToUniversalTime().ToString("yyyy-MM-ddTHH-mm-ss") + "Z";
+                    _logger.LogInformation("Eski modellerin arşivlenmesi için eğitim başlangıç zamanı kullanılıyor: {StartedAt}", archiveTimestamp);
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Eğitim geçmişinden başlangıç zamanı alınamadı, mevcut zaman kullanılacak.");
+        }
+
         var archiveSubDir    = $"models/archive/{archiveTimestamp}";
         int archivedCount    = 0;
 
@@ -441,11 +459,15 @@ public class ActiveLearningService : IActiveLearningService
         {
             try
             {
-                var existingBytes = await _fileStorageService.GetFileBytesAsync($"models/latest/{fileName}");
-                if (existingBytes != null)
+                var filePath = $"models/latest/{fileName}";
+                if (await _fileStorageService.FileExistsAsync(filePath))
                 {
-                    await _fileStorageService.SaveFileBytesAsync(existingBytes, fileName, archiveSubDir);
-                    archivedCount++;
+                    var existingBytes = await _fileStorageService.GetFileBytesAsync(filePath);
+                    if (existingBytes != null)
+                    {
+                        await _fileStorageService.SaveFileBytesAsync(existingBytes, fileName, archiveSubDir, preserveFileName: true);
+                        archivedCount++;
+                    }
                 }
             }
             catch (Exception ex)
@@ -472,7 +494,7 @@ public class ActiveLearningService : IActiveLearningService
                 if (response.IsSuccessStatusCode)
                 {
                     var fileBytes = await response.Content.ReadAsByteArrayAsync();
-                    await _fileStorageService.SaveFileBytesAsync(fileBytes, fileName, "models/latest");
+                    await _fileStorageService.SaveFileBytesAsync(fileBytes, fileName, "models/latest", preserveFileName: true);
                     _logger.LogInformation("Model dosyası başarıyla Backblaze B2 models/latest'e kaydedildi: {File}", fileName);
                 }
                 else

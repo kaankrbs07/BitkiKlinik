@@ -144,6 +144,17 @@ public class LocalFileStorageService : IFileStorageService
     }
 
     /// <inheritdoc />
+    public Task<bool> FileExistsAsync(string? relativeUrl)
+    {
+        if (string.IsNullOrWhiteSpace(relativeUrl))
+            return Task.FromResult(false);
+
+        var relativePath = relativeUrl.TrimStart('/');
+        var physicalPath = Path.Combine(_env.ContentRootPath, "wwwroot", relativePath);
+        return Task.FromResult(File.Exists(physicalPath));
+    }
+
+    /// <inheritdoc />
     public async Task<byte[]?> GetFileBytesAsync(string? relativeUrl)
     {
         if (string.IsNullOrWhiteSpace(relativeUrl))
@@ -161,7 +172,7 @@ public class LocalFileStorageService : IFileStorageService
     }
 
     /// <inheritdoc />
-    public async Task<string> SaveFileBytesAsync(byte[] fileBytes, string fileName, string subDirectory)
+    public async Task<string> SaveFileBytesAsync(byte[] fileBytes, string fileName, string subDirectory, bool preserveFileName = false)
     {
         if (fileBytes == null || fileBytes.Length == 0)
             throw new ArgumentException("Yazılacak dosya verisi boş olamaz.");
@@ -170,13 +181,13 @@ public class LocalFileStorageService : IFileStorageService
         var physicalFolder = Path.Combine(_env.ContentRootPath, _basePath, subDirectory);
         Directory.CreateDirectory(physicalFolder);
 
-        // Benzersiz dosya adı üret
+        // Dosya adı üret veya orijinal ismi koru
         var extension = Path.GetExtension(fileName).ToLowerInvariant();
         if (string.IsNullOrEmpty(extension))
         {
             extension = ".jpg";
         }
-        var uniqueName = $"{Guid.NewGuid()}{extension}";
+        var uniqueName = preserveFileName ? fileName : $"{Guid.NewGuid()}{extension}";
         var fullPath = Path.Combine(physicalFolder, uniqueName);
 
         // Byte dizisini diske yaz

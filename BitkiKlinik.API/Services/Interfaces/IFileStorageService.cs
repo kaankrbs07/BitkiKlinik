@@ -38,6 +38,13 @@ public interface IFileStorageService
     Task MigrateLocalFilesAsync(string webRootPath);
 
     /// <summary>
+    /// Belirtilen dosya yolundaki dosyanın var olup olmadığını kontrol eder.
+    /// </summary>
+    /// <param name="relativeUrl">Dosyanın göreli URL'i</param>
+    /// <returns>Dosya mevcut ise true, aksi halde false</returns>
+    Task<bool> FileExistsAsync(string? relativeUrl);
+
+    /// <summary>
     /// Belirtilen dosya yolundaki dosyanın byte verilerini asenkron olarak okur.
     /// </summary>
     /// <param name="relativeUrl">Dosyanın göreli URL'i</param>
@@ -50,8 +57,9 @@ public interface IFileStorageService
     /// <param name="fileBytes">Dosyanın byte verisi</param>
     /// <param name="fileName">Dosya adı (uzantısıyla birlikte)</param>
     /// <param name="subDirectory">Hedef alt dizin (ör: "profiles", "scans")</param>
+    /// <param name="preserveFileName">Eğer true ise dosya adı GUID ile değiştirilmeden orijinal haliyle korunur.</param>
     /// <returns>Kaydedilen dosyanın göreli URL'i</returns>
-    Task<string> SaveFileBytesAsync(byte[] fileBytes, string fileName, string subDirectory);
+    Task<string> SaveFileBytesAsync(byte[] fileBytes, string fileName, string subDirectory, bool preserveFileName = false);
 
     /// <summary>
     /// Dosyanın uzantı ve boyut kurallarına uygunluğunu doğrular.

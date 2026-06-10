@@ -234,6 +234,29 @@ public class B2FileStorageService : IFileStorageService
     }
 
     /// <inheritdoc />
+    public async Task<bool> FileExistsAsync(string? relativeUrl)
+    {
+        if (string.IsNullOrWhiteSpace(relativeUrl))
+            return false;
+
+        try
+        {
+            var key = ExtractKeyFromRelativeUrl(relativeUrl);
+            await _s3Client.GetObjectMetadataAsync(_bucketName, key);
+            return true;
+        }
+        catch (AmazonS3Exception ex) when (ex.StatusCode == System.Net.HttpStatusCode.NotFound)
+        {
+            return false;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Backblaze B2 dosya varlığı kontrol edilirken hata oluştu: {Url}", relativeUrl);
+            return false;
+        }
+    }
+
+    /// <inheritdoc />
     public async Task<byte[]?> GetFileBytesAsync(string? relativeUrl)
     {
         if (string.IsNullOrWhiteSpace(relativeUrl))
@@ -266,18 +289,18 @@ public class B2FileStorageService : IFileStorageService
     }
 
     /// <inheritdoc />
-    public async Task<string> SaveFileBytesAsync(byte[] fileBytes, string fileName, string subDirectory)
+    public async Task<string> SaveFileBytesAsync(byte[] fileBytes, string fileName, string subDirectory, bool preserveFileName = false)
     {
         if (fileBytes == null || fileBytes.Length == 0)
             throw new ArgumentException("Yazılacak dosya verisi boş olamaz.");
 
-        // 1. Benzersiz dosya adı ve B2 nesne anahtarı (key) üret
+        // 1. Dosya adı ve B2 nesne anahtarı (key) üret
         var extension = Path.GetExtension(fileName).ToLowerInvariant();
         if (string.IsNullOrEmpty(extension))
         {
             extension = ".jpg";
         }
-        var uniqueName = $"{Guid.NewGuid()}{extension}";
+        var uniqueName = preserveFileName ? fileName : $"{Guid.NewGuid()}{extension}";
         var key = $"{subDirectory}/{uniqueName}".Replace("\\", "/");
 
         // 2. Dosyayı Backblaze B2'ye yükle

@@ -44,6 +44,7 @@ export interface UseActiveLearningReturn {
   triggerRetrain: () => Promise<boolean>;
   info: string | null;
   setInfo: (msg: string | null) => void;
+  setError: (msg: string | null) => void;
 }
 
 // ─── Custom Hook ─────────────────────────────────────────────────────
@@ -226,6 +227,7 @@ export function useActiveLearning(): UseActiveLearningReturn {
     isLoading,
     isRetrainingLoading,
     error,
+    setError,
     refresh,
     resolveItem,
     ignoreItem,

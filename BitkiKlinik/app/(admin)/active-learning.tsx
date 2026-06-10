@@ -83,6 +83,7 @@ export default function ActiveLearningScreen() {
     isLoading,
     isRetrainingLoading,
     error,
+    setError,
     info,
     setInfo,
     refresh,
