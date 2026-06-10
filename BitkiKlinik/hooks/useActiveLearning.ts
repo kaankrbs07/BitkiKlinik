@@ -42,6 +42,8 @@ export interface UseActiveLearningReturn {
   resolveItem: (queueId: number, correctedDisease: string) => Promise<boolean>;
   ignoreItem: (queueId: number) => Promise<boolean>;
   triggerRetrain: () => Promise<boolean>;
+  info: string | null;
+  setInfo: (msg: string | null) => void;
 }
 
 // ─── Custom Hook ─────────────────────────────────────────────────────
@@ -56,6 +58,7 @@ export function useActiveLearning(): UseActiveLearningReturn {
   const [isLoading, setIsLoading] = useState(true);
   const [isRetrainingLoading, setIsRetrainingLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [info, setInfo] = useState<string | null>(null);
   
   const pollingTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const isAuthenticated = useAuthStore((state) => state.isAuthenticated);
@@ -102,6 +105,7 @@ export function useActiveLearning(): UseActiveLearningReturn {
     if (!isAuthenticated) return;
     setIsLoading(true);
     setError(null);
+    setInfo(null);
     try {
       await Promise.all([fetchPending(), fetchStats(), fetchRetrainStatus()]);
     } finally {
@@ -190,12 +194,20 @@ export function useActiveLearning(): UseActiveLearningReturn {
     setIsRetrainingLoading(true);
     try {
       setError(null);
+      setInfo(null);
       const response = await dotnetClient.post(`${BASE_DOTNET}/retrain`);
-      if (response.data?.status === 'started' || response.data?.status === 'success') {
+      if (response.data?.status === 'started' || response.data?.status === 'success' || response.data?.status === 'queued') {
         // Durumu anında sorgula ve poller'ı başlat
+        setInfo(response.data?.message ?? 'Yeniden eğitim işlemi başlatıldı.');
         await fetchRetrainStatus();
         return true;
       }
+      
+      if (response.data?.status === 'insufficient_data') {
+        setInfo(response.data?.message);
+        return false;
+      }
+
       setError(response.data?.message ?? 'Yeniden eğitim başlatılamadı.');
       return false;
     } catch (err: any) {
@@ -218,5 +230,7 @@ export function useActiveLearning(): UseActiveLearningReturn {
     resolveItem,
     ignoreItem,
     triggerRetrain,
+    info,
+    setInfo,
   };
 }

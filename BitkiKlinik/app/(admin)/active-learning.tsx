@@ -83,6 +83,8 @@ export default function ActiveLearningScreen() {
     isLoading,
     isRetrainingLoading,
     error,
+    info,
+    setInfo,
     refresh,
     resolveItem,
     ignoreItem,
@@ -178,6 +180,8 @@ export default function ActiveLearningScreen() {
       if (ok) {
         setSelectedItem(null);
         setSearchQuery('');
+        setInfo(null);
+        setError(null);
       } else {
         Alert.alert('Hata', 'Değişiklik kaydedilemedi.');
       }
@@ -207,6 +211,13 @@ export default function ActiveLearningScreen() {
             <Ionicons name="refresh" size={20} color={C.slate} />
           </TouchableOpacity>
         </View>
+
+        {info && (
+          <View style={s.infoCard}>
+            <Ionicons name="information-circle" size={20} color={C.primary} />
+            <Text style={s.infoTxt}>{info}</Text>
+          </View>
+        )}
 
         {error && (
           <View style={s.errCard}>
@@ -596,6 +607,17 @@ const getStyles = (C: any) => StyleSheet.create({
     marginBottom: 8,
   },
   errTxt: { color: C.rose, fontSize: 13, flex: 1 },
+  infoCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    backgroundColor: C.primaryLight,
+    marginHorizontal: 20,
+    padding: 12,
+    borderRadius: 12,
+    marginBottom: 8,
+  },
+  infoTxt: { color: C.primary, fontSize: 13, flex: 1 },
   scrollContent: { paddingHorizontal: 20, paddingBottom: 40 },
   
   // Stats

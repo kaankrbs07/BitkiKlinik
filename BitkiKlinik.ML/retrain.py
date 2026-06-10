@@ -108,11 +108,7 @@ def retrain_model(progress_callback=None, triggered_by="system"):
     # ── 2. Aktif Öğrenme Örnekleri (admin doğrulamaları) ───────────────────
     al_samples, active_class_indices = _collect_samples(active_dir, class_to_idx)
 
-    if not al_samples:
-        raise ValueError(
-            "Yeniden eğitim için aktif öğrenme veri setinde hiç görsel bulunamadı. "
-            "Lütfen önce admin panelinden en az bir teşhisi doğrulayın."
-        )
+
 
     # Memory buffer olmadığında minimum örnek kontrolü
     has_buffer = os.path.exists(buffer_dir) and any(
