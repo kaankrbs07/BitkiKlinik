@@ -4,7 +4,7 @@ using System.IO;
 using System.Text;
 using System.Threading.Tasks;
 using BitkiKlinik.API.Services.Implementations;
-using BitkiKlinik.API.Services.Helpers;
+using BitkiKlinik.API.Helpers;
 using FluentAssertions;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Http;

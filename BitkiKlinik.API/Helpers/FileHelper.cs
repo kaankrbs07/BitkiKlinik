@@ -3,7 +3,7 @@ using System;
 using System.IO;
 using System.Linq;
 
-namespace BitkiKlinik.API.Services.Helpers;
+namespace BitkiKlinik.API.Helpers;
 
 /// <summary>
 /// Dosya işlemlerinde kullanılan ortak doğrulama ve yardımcı işlevleri barındırır.

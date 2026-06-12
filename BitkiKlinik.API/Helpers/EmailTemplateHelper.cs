@@ -1,6 +1,6 @@
 using System;
 
-namespace BitkiKlinik.API.Services.Helpers;
+namespace BitkiKlinik.API.Helpers;
 
 /// <summary>
 /// Kullanıcılara gönderilecek e-postalar için zengin ve modern HTML şablonları üretir.

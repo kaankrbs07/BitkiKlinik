@@ -1,7 +1,7 @@
 using Amazon.S3;
 using Amazon.S3.Model;
 using BitkiKlinik.API.Services.Interfaces;
-using BitkiKlinik.API.Services.Helpers;
+using BitkiKlinik.API.Helpers;
 using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;

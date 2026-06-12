@@ -2,7 +2,7 @@ using System;
 using System.Linq;
 using Microsoft.AspNetCore.Http;
 using BitkiKlinik.API.Services.Interfaces;
-using BitkiKlinik.API.Services.Helpers;
+using BitkiKlinik.API.Helpers;
 
 namespace BitkiKlinik.API.Services.Implementations;
 

@@ -1,7 +1,7 @@
 using BitkiKlinik.API.DTOs;
 using BitkiKlinik.API.Models;
 using BitkiKlinik.API.Services.Interfaces;
-using BitkiKlinik.API.Services.Helpers;
+using BitkiKlinik.API.Helpers;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.RateLimiting;
 using System.Security.Cryptography;
