@@ -21,8 +21,9 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 COPY requirements.txt .
 
 # PyTorch GPU versiyonunu kuruyoruz (yüksek zaman aşımı ve tekrar deneme ile kararlı hale getirildi)
-RUN pip install --no-cache-dir --default-timeout=1000 --retries 10 torch torchvision torchaudio \
-    && pip install --no-cache-dir --default-timeout=1000 --retries 10 -r requirements.txt
+RUN --mount=type=cache,target=/root/.cache/pip \
+    pip install --default-timeout=1000 --retries 10 torch torchvision torchaudio \
+    && pip install --default-timeout=1000 --retries 10 -r requirements.txt
 
 # Uygulama kaynak kodunu kopyala
 COPY serve.py retrain.py retrain_worker.py ./

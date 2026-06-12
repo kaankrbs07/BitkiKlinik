@@ -12,11 +12,13 @@ WORKDIR /src
 
 # Önce proje dosyasını kopyala (restore cache avantajı)
 COPY BitkiKlinik.API.csproj .
-RUN dotnet restore
+RUN --mount=type=cache,target=/root/.nuget/packages \
+    dotnet restore
 
 # Kaynak kodun tamamını kopyala ve yayınla
 COPY . .
-RUN dotnet publish -c Release -o /app/publish --no-restore
+RUN --mount=type=cache,target=/root/.nuget/packages \
+    dotnet publish -c Release -o /app/publish --no-restore
 
 # ── Çalışma Aşaması ───────────────────────────
 FROM mcr.microsoft.com/dotnet/aspnet:9.0 AS final

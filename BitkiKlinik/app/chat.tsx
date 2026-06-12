@@ -6,13 +6,13 @@ import {
   FlatList,
   TextInput,
   TouchableOpacity,
-  KeyboardAvoidingView,
   Platform,
   ActivityIndicator,
   StatusBar,
-  Keyboard
+  Keyboard,
+  Animated
 } from 'react-native';
-import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAppTheme } from '../hooks/useAppTheme';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
@@ -102,6 +102,7 @@ export default function ChatScreen() {
   const [inputText, setInputText] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const flatListRef = useRef<FlatList>(null);
+  const keyboardHeightAnim = useRef(new Animated.Value(0)).current;
 
   // Sohbet geçmişini veritabanından çek veya ilk karşılama mesajını ayarla
   useEffect(() => {
@@ -149,6 +150,34 @@ export default function ChatScreen() {
 
     loadHistory();
   }, [currentSessionId, scanId]);
+
+  // Klavye yüksekliğini takip et
+  useEffect(() => {
+    const showEvent = Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow';
+    const hideEvent = Platform.OS === 'ios' ? 'keyboardWillHide' : 'keyboardDidHide';
+
+    const showSub = Keyboard.addListener(showEvent, (e) => {
+      Animated.timing(keyboardHeightAnim, {
+        toValue: e.endCoordinates.height,
+        duration: Platform.OS === 'ios' ? e.duration || 250 : 100,
+        useNativeDriver: false,
+      }).start();
+      setTimeout(() => flatListRef.current?.scrollToEnd({ animated: true }), 150);
+    });
+
+    const hideSub = Keyboard.addListener(hideEvent, (e) => {
+      Animated.timing(keyboardHeightAnim, {
+        toValue: 0,
+        duration: Platform.OS === 'ios' ? e.duration || 250 : 100,
+        useNativeDriver: false,
+      }).start();
+    });
+
+    return () => {
+      showSub.remove();
+      hideSub.remove();
+    };
+  }, [keyboardHeightAnim]);
 
   // Yeni mesaj geldiğinde en alta kaydır
   const scrollToBottom = () => {
@@ -246,9 +275,9 @@ export default function ChatScreen() {
   };
 
   return (
-    <SafeAreaView style={styles.container}>
+    <View style={[styles.container, { paddingTop: insets.top }]}>
       <StatusBar barStyle={isDark ? 'light-content' : 'dark-content'} />
-      
+
       {/* Header */}
       <View style={styles.header}>
         <TouchableOpacity style={styles.backButton} onPress={() => router.back()}>
@@ -266,11 +295,7 @@ export default function ChatScreen() {
         </View>
       </View>
 
-      <KeyboardAvoidingView
-        style={{ flex: 1 }}
-        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-        keyboardVerticalOffset={Platform.OS === 'ios' ? insets.bottom : 0}
-      >
+      <Animated.View style={{ flex: 1, paddingBottom: keyboardHeightAnim }}>
         {/* Mesaj Listesi */}
         <FlatList
           ref={flatListRef}
@@ -293,7 +318,7 @@ export default function ChatScreen() {
         )}
 
         {/* Input Bar */}
-        <View style={styles.inputContainer}>
+        <View style={[styles.inputContainer, { paddingBottom: insets.bottom > 0 ? insets.bottom : 10 }]}>
           <TextInput
             style={styles.input}
             value={inputText}
@@ -303,16 +328,16 @@ export default function ChatScreen() {
             multiline
             maxLength={1000}
           />
-          <TouchableOpacity 
-            style={[styles.sendButton, inputText.trim() === '' && styles.sendButtonDisabled]} 
+          <TouchableOpacity
+            style={[styles.sendButton, inputText.trim() === '' && styles.sendButtonDisabled]}
             onPress={handleSend}
             disabled={inputText.trim() === '' || isLoading}
           >
             <Ionicons name="send" size={18} color={colors.white} />
           </TouchableOpacity>
         </View>
-      </KeyboardAvoidingView>
-    </SafeAreaView>
+      </Animated.View>
+    </View>
   );
 }
 
@@ -464,7 +489,8 @@ const getStyles = (colors: typeof LIGHT_COLORS) => StyleSheet.create({
   inputContainer: {
     flexDirection: 'row',
     paddingHorizontal: 16,
-    paddingVertical: 10,
+    paddingTop: 10,
+    paddingBottom: 10,
     backgroundColor: colors.white,
     borderTopWidth: 1,
     borderTopColor: colors.border,

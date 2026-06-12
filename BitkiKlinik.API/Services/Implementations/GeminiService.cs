@@ -80,11 +80,11 @@ public class GeminiService : IGeminiService
         var jsonPayload = JsonSerializer.Serialize(requestBody, jsonOptions);
         
         int maxRetries = 3;
-        int delayMs = 1500; // 1.5 saniye başlangıç gecikmesi
+        int delayMs = 500; // 0.5 saniye başlangıç gecikmesi
 
-        // Hata durumunda sırasıyla denenecek model zinciri: Gemini 3.5 Flash -> Gemini 3 Flash -> Gemini 2.5 Flash
+        // Hata durumunda sırasıyla denenecek model zinciri: Gemini 3.5 Flash -> Gemini 3.1 Flash Lite -> Gemini 2.5 Flash
         var modelsToTry = new List<string>();
-        var preferredOrder = new List<string> { "gemini-3.5-flash", "gemini-3-flash", "gemini-2.5-flash" };
+        var preferredOrder = new List<string> { "gemini-3.5-flash", "gemini-3.1-flash-lite", "gemini-2.5-flash" };
 
         if (!preferredOrder.Contains(_model) && !string.IsNullOrEmpty(_model))
         {
@@ -95,6 +95,7 @@ public class GeminiService : IGeminiService
         for (int attempt = 1; attempt <= maxRetries; attempt++)
         {
             string activeModel = modelsToTry[Math.Min(attempt - 1, modelsToTry.Count - 1)];
+            bool shouldDelay = true;
 
             try
             {
@@ -102,7 +103,11 @@ public class GeminiService : IGeminiService
                 var content = new StringContent(jsonPayload, Encoding.UTF8, "application/json");
 
                 _logger.LogInformation("Gemini API'sine istek gönderiliyor. Model: {Model} (Deneme {Attempt}/{MaxRetries})", activeModel, attempt, maxRetries);
-                var response = await client.PostAsync(requestUrl, content);
+                
+                // İlk denemeler için kısa timeout (3sn), son deneme için uzun timeout (15sn)
+                var timeoutSeconds = (attempt == maxRetries) ? 15 : 3;
+                using var cts = new System.Threading.CancellationTokenSource(TimeSpan.FromSeconds(timeoutSeconds));
+                var response = await client.PostAsync(requestUrl, content, cts.Token);
 
                 if (response.IsSuccessStatusCode)
                 {
@@ -124,6 +129,15 @@ public class GeminiService : IGeminiService
                 _logger.LogWarning("Gemini API hata döndürdü. Kod: {StatusCode}, Model: {Model}, Detay: {Detail}. Deneme: {Attempt}/{MaxRetries}", 
                     response.StatusCode, activeModel, errorContent, attempt, maxRetries);
 
+                // 400, 401, 403, 404 gibi istemci hatalarında beklemeye gerek yok
+                if (response.StatusCode == System.Net.HttpStatusCode.BadRequest ||
+                    response.StatusCode == System.Net.HttpStatusCode.Unauthorized ||
+                    response.StatusCode == System.Net.HttpStatusCode.Forbidden ||
+                    response.StatusCode == System.Net.HttpStatusCode.NotFound)
+                {
+                    shouldDelay = false;
+                }
+
                 if (attempt == maxRetries)
                 {
                     throw new HttpRequestException($"Yapay zeka servisi yoğunluk/hata nedeniyle yanıt veremiyor. Son denenen model: {activeModel}, Hata kodu: {response.StatusCode}");
@@ -131,11 +145,14 @@ public class GeminiService : IGeminiService
             }
             catch (Exception ex) when (attempt < maxRetries)
             {
-                _logger.LogWarning(ex, "Gemini API çağrısı sırasında hata oluştu. Bir sonraki model denenecek. Bekleme süresi: {Delay}ms", delayMs * attempt);
+                _logger.LogWarning(ex, "Gemini API çağrısı sırasında hata oluştu. Bir sonraki model denenecek.");
             }
 
-            // Üstel bekleme süresi (exponential backoff)
-            await Task.Delay(delayMs * attempt);
+            if (shouldDelay && attempt < maxRetries)
+            {
+                // Üstel bekleme süresi (exponential backoff)
+                await Task.Delay(delayMs * attempt);
+            }
         }
 
         throw new HttpRequestException("Yapay zeka servisi istek zaman aşımı.");
