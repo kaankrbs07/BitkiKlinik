@@ -77,14 +77,14 @@ const ACTION_META: Record<string, { label: string; icon: any; getColor: (c: any)
   SoftDelete: { label: 'Pasife Alma',icon: 'eye-off',          getColor: c => c.violet,   getBg: c => c.violetLight },
 };
 
-// ─── Tablo Adı → Türkçe ───────────────────────────────────────────────
+// ─── Tablo Adı → İngilizce ─────────────────────────────────────────────
 const TABLE_LABELS: Record<string, string> = {
-  Users:    'Kullanıcılar',
-  Disease:  'Hastalıklar',
-  Treatment:'Tedaviler',
+  Users:    'Users',
+  Diseases: 'Diseases',
+  Treatments:'Treatments',
 };
 
-const ALL_TABLES = ['Tümü', 'Users', 'Disease', 'Treatment'];
+const ALL_TABLES = ['Tümü', 'Users', 'Diseases', 'Treatments'];
 const ALL_ACTIONS = ['Tümü', 'Insert', 'Update', 'Delete', 'SoftDelete'];
 
 export default function AuditLogsScreen() {
