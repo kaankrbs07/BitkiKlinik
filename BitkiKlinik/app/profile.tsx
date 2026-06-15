@@ -572,93 +572,98 @@ export default function ProfileScreen() {
 
         {/* ─── Şifre Yenileme Bottom Modal (Premium UI) ─── */}
         <Modal visible={showResetModal} animationType="slide" transparent>
-          <View style={styles.modalOverlay}>
-            <View style={styles.modalContent}>
-              <View style={styles.modalDragBar} />
-              
-              <View style={styles.modalHeader}>
-                <Text style={styles.modalTitle}>Şifre Yenileme 🔑</Text>
-                <TouchableOpacity onPress={() => { setShowResetModal(false); setResetStep(1); }}>
-                  <Ionicons name="close-circle" size={26} color="#666" />
-                </TouchableOpacity>
+          <KeyboardAvoidingView 
+            style={{ flex: 1 }} 
+            behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+          >
+            <View style={styles.modalOverlay}>
+              <View style={styles.modalContent}>
+                <View style={styles.modalDragBar} />
+                
+                <View style={styles.modalHeader}>
+                  <Text style={styles.modalTitle}>Şifre Yenileme 🔑</Text>
+                  <TouchableOpacity onPress={() => { setShowResetModal(false); setResetStep(1); }}>
+                    <Ionicons name="close-circle" size={26} color="#666" />
+                  </TouchableOpacity>
+                </View>
+
+                <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.modalScroll}>
+                  {resetStep === 1 ? (
+                    // ADIM 1: Kod Gönderimi Onayı
+                    <View>
+                      <Text style={styles.modalInfo}>
+                        Şifrenizi güvenle yenilemek için kayıtlı e-posta adresiniz olan <Text style={{ fontWeight: 'bold', color: colors.slate }}>{profile?.email}</Text> adresine 6 haneli bir güvenlik kodu gönderilecektir. Onaylıyor musunuz?
+                      </Text>
+
+                      <TouchableOpacity 
+                        style={styles.modalButton} 
+                        onPress={handleRequestResetCode} 
+                        disabled={resetLoading}
+                      >
+                        {resetLoading ? (
+                          <ActivityIndicator color="white" />
+                        ) : (
+                          <>
+                            <Ionicons name="mail-outline" size={20} color="white" style={{ marginRight: 8 }} />
+                            <Text style={styles.modalButtonTxt}>Güvenlik Kodu Gönder</Text>
+                          </>
+                        )}
+                      </TouchableOpacity>
+                    </View>
+                  ) : (
+                    // ADIM 2: Kod ve Yeni Şifre Girişi
+                    <View>
+                      <Text style={styles.modalInfo}>
+                        <Text style={{ fontWeight: 'bold', color: colors.emerald }}>{profile?.email}</Text> adresine gönderilen 6 haneli güvenlik kodunu ve yeni şifrenizi girin.
+                      </Text>
+
+                      <TextInput
+                        style={styles.modalInput}
+                        placeholder="6 Haneli Doğrulama Kodu"
+                        placeholderTextColor="#999"
+                        value={resetCode}
+                        onChangeText={code => setResetCode(code.replace(/[^0-9]/g, ''))}
+                        keyboardType="number-pad"
+                        maxLength={6}
+                      />
+
+                      <TextInput
+                        style={styles.modalInput}
+                        placeholder="Yeni Şifreniz (Min 8 Karakter)"
+                        placeholderTextColor="#999"
+                        value={newPassword}
+                        onChangeText={setNewPassword}
+                        secureTextEntry
+                      />
+
+                      <TouchableOpacity 
+                        style={[styles.modalButton, { backgroundColor: colors.emerald }]} 
+                        onPress={handleVerifyAndResetPassword} 
+                        disabled={resetLoading}
+                      >
+                        {resetLoading ? (
+                          <ActivityIndicator color="white" />
+                        ) : (
+                          <>
+                            <Ionicons name="checkmark-circle-outline" size={20} color="white" style={{ marginRight: 8 }} />
+                            <Text style={styles.modalButtonTxt}>Şifremi Sıfırla & Güncelle</Text>
+                          </>
+                        )}
+                      </TouchableOpacity>
+
+                      <TouchableOpacity 
+                        style={styles.backToStep1Btn} 
+                        onPress={() => setResetStep(1)}
+                        disabled={resetLoading}
+                      >
+                        <Text style={styles.backToStep1Txt}>Geri Dön</Text>
+                      </TouchableOpacity>
+                    </View>
+                  )}
+                </ScrollView>
               </View>
-
-              <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.modalScroll}>
-                {resetStep === 1 ? (
-                  // ADIM 1: Kod Gönderimi Onayı
-                  <View>
-                    <Text style={styles.modalInfo}>
-                      Şifrenizi güvenle yenilemek için kayıtlı e-posta adresiniz olan <Text style={{ fontWeight: 'bold', color: colors.slate }}>{profile?.email}</Text> adresine 6 haneli bir güvenlik kodu gönderilecektir. Onaylıyor musunuz?
-                    </Text>
-
-                    <TouchableOpacity 
-                      style={styles.modalButton} 
-                      onPress={handleRequestResetCode} 
-                      disabled={resetLoading}
-                    >
-                      {resetLoading ? (
-                        <ActivityIndicator color="white" />
-                      ) : (
-                        <>
-                          <Ionicons name="mail-outline" size={20} color="white" style={{ marginRight: 8 }} />
-                          <Text style={styles.modalButtonTxt}>Güvenlik Kodu Gönder</Text>
-                        </>
-                      )}
-                    </TouchableOpacity>
-                  </View>
-                ) : (
-                  // ADIM 2: Kod ve Yeni Şifre Girişi
-                  <View>
-                    <Text style={styles.modalInfo}>
-                      <Text style={{ fontWeight: 'bold', color: colors.emerald }}>{profile?.email}</Text> adresine gönderilen 6 haneli güvenlik kodunu ve yeni şifrenizi girin.
-                    </Text>
-
-                    <TextInput
-                      style={styles.modalInput}
-                      placeholder="6 Haneli Doğrulama Kodu"
-                      placeholderTextColor="#999"
-                      value={resetCode}
-                      onChangeText={code => setResetCode(code.replace(/[^0-9]/g, ''))}
-                      keyboardType="number-pad"
-                      maxLength={6}
-                    />
-
-                    <TextInput
-                      style={styles.modalInput}
-                      placeholder="Yeni Şifreniz (Min 8 Karakter)"
-                      placeholderTextColor="#999"
-                      value={newPassword}
-                      onChangeText={setNewPassword}
-                      secureTextEntry
-                    />
-
-                    <TouchableOpacity 
-                      style={[styles.modalButton, { backgroundColor: colors.emerald }]} 
-                      onPress={handleVerifyAndResetPassword} 
-                      disabled={resetLoading}
-                    >
-                      {resetLoading ? (
-                        <ActivityIndicator color="white" />
-                      ) : (
-                        <>
-                          <Ionicons name="checkmark-circle-outline" size={20} color="white" style={{ marginRight: 8 }} />
-                          <Text style={styles.modalButtonTxt}>Şifremi Sıfırla & Güncelle</Text>
-                        </>
-                      )}
-                    </TouchableOpacity>
-
-                    <TouchableOpacity 
-                      style={styles.backToStep1Btn} 
-                      onPress={() => setResetStep(1)}
-                      disabled={resetLoading}
-                    >
-                      <Text style={styles.backToStep1Txt}>Geri Dön</Text>
-                    </TouchableOpacity>
-                  </View>
-                )}
-              </ScrollView>
             </View>
-          </View>
+          </KeyboardAvoidingView>
         </Modal>
         {/* ─── Orijinal Fotoğraf Önizleme Modalı (Full Screen) ─── */}
         <Modal visible={showImagePreviewModal} transparent animationType="fade">

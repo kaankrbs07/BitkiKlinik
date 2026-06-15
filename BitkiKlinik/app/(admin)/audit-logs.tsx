@@ -166,10 +166,13 @@ export default function AuditLogsScreen() {
 
   // ── Tarih Formatlama ─────────────────────────────────────────────────
   const formatDate = (iso: string) => {
-    const d = new Date(iso);
+    // Backend UTC olarak kaydeder ama 'Z' son eki olmayabilir
+    const utcIso = iso.endsWith('Z') ? iso : iso + 'Z';
+    const d = new Date(utcIso);
     return d.toLocaleString('tr-TR', {
       day: '2-digit', month: '2-digit', year: 'numeric',
       hour: '2-digit', minute: '2-digit',
+      timeZone: 'Europe/Istanbul',
     });
   };
 

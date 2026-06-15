@@ -272,6 +272,10 @@ public class AuthController : ControllerBase
         if (user.VerificationCodeExpiryTime < DateTime.UtcNow)
             return BadRequest(new { Message = "Sıfırlama kodunun süresi dolmuş. Lütfen yeni bir kod isteyin." });
 
+        // Yeni şifre eski şifreyle aynı olmamalı
+        if (_passwordHasher.Verify(dto.NewPassword, user.Password))
+            return BadRequest(new { Message = "Yeni şifreniz mevcut şifrenizle aynı olamaz. Lütfen farklı bir şifre belirleyin." });
+
         // Şifreyi hashleyerek güncelle
         user.Password = _passwordHasher.Hash(dto.NewPassword);
         user.VerificationCode = null;

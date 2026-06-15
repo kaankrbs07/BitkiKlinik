@@ -197,11 +197,6 @@ export default function ScanScreen() {
     );
   }
 
-  // Tarama çizgisinin Y koordinatı
-  const scanLineY = scanAnim.interpolate({
-    inputRange: [0, 1],
-    outputRange: [0, 246],
-  });
 
   return (
     <View style={styles.container}>
@@ -220,19 +215,6 @@ export default function ScanScreen() {
             </TouchableOpacity>
           </View>
 
-          {/* Tarama çerçevesi + animasyonlu çizgi */}
-          <View style={styles.frameWrapper}>
-            <View style={styles.scanFrame}>
-              {/* Köşe işaretleri */}
-              <View style={[styles.corner, styles.cornerTL]} />
-              <View style={[styles.corner, styles.cornerTR]} />
-              <View style={[styles.corner, styles.cornerBL]} />
-              <View style={[styles.corner, styles.cornerBR]} />
-              {/* Hareketli tarama çizgisi */}
-              <Animated.View style={[styles.scanLine, { transform: [{ translateY: scanLineY }] }]} />
-            </View>
-            <Text style={styles.instructionText}>Bitki yaprağını çerçevenin içine alın</Text>
-          </View>
 
           {/* Alt kontroller */}
           <View style={styles.controlsContainer}>
@@ -259,7 +241,6 @@ export default function ScanScreen() {
   );
 }
 
-const FRAME_SIZE = 250;
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: 'black' },
@@ -322,43 +303,6 @@ const styles = StyleSheet.create({
     borderColor: 'rgba(16,185,129,0.5)',
   },
   topLabelText: { color: 'white', fontSize: 13, fontWeight: '600' },
-  frameWrapper: { alignItems: 'center', marginTop: 20 },
-  scanFrame: {
-    width: FRAME_SIZE,
-    height: FRAME_SIZE,
-    borderRadius: 16,
-    backgroundColor: 'rgba(0,0,0,0.08)',
-    overflow: 'hidden',
-    position: 'relative',
-  },
-  corner: { position: 'absolute', width: 24, height: 24, borderColor: EMERALD, borderRadius: 4 },
-  cornerTL: { top: 0, left: 0, borderTopWidth: 3, borderLeftWidth: 3 },
-  cornerTR: { top: 0, right: 0, borderTopWidth: 3, borderRightWidth: 3 },
-  cornerBL: { bottom: 0, left: 0, borderBottomWidth: 3, borderLeftWidth: 3 },
-  cornerBR: { bottom: 0, right: 0, borderBottomWidth: 3, borderRightWidth: 3 },
-  scanLine: {
-    position: 'absolute',
-    left: 0,
-    right: 0,
-    height: 2,
-    backgroundColor: EMERALD,
-    shadowColor: EMERALD,
-    shadowOffset: { width: 0, height: 0 },
-    shadowOpacity: 0.9,
-    shadowRadius: 6,
-    elevation: 4,
-  },
-  instructionText: {
-    color: 'white',
-    marginTop: 20,
-    fontSize: 15,
-    fontWeight: '500',
-    textAlign: 'center',
-    paddingHorizontal: 20,
-    textShadowColor: 'rgba(0,0,0,0.8)',
-    textShadowOffset: { width: 0, height: 1 },
-    textShadowRadius: 6,
-  },
   controlsContainer: {
     flexDirection: 'row',
     justifyContent: 'space-around',

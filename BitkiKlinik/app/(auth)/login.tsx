@@ -142,7 +142,7 @@ export default function LoginScreen() {
           />
           <TextInput
             style={styles.input}
-            placeholder="Şifre (Min 8 krkt, Büyük/Küçük harf)"
+            placeholder="Şifre"
             placeholderTextColor="#999"
             value={password}
             onChangeText={setPassword}
@@ -178,7 +178,11 @@ export default function LoginScreen() {
 
       {/* ─── Şifremi Unuttum Bottom Modal (Premium UI) ─── */}
       <Modal visible={showForgotModal} animationType="slide" transparent>
-        <View style={styles.modalOverlay}>
+        <KeyboardAvoidingView 
+          style={{ flex: 1 }} 
+          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        >
+          <View style={styles.modalOverlay}>
           <View style={styles.modalContent}>
             <View style={styles.modalDragBar} />
             
@@ -274,7 +278,8 @@ export default function LoginScreen() {
               )}
             </ScrollView>
           </View>
-        </View>
+          </View>
+        </KeyboardAvoidingView>
       </Modal>
     </KeyboardAvoidingView>
   );
@@ -328,10 +333,9 @@ const styles = StyleSheet.create({
     fontSize: 15,
   },
   forgotLinkAction: {
-    color: '#6366f1',
+    color: '#4cd964',
     fontSize: 15,
     fontWeight: 'bold',
-    textDecorationLine: 'underline',
   },
   loginButton: {
     backgroundColor: '#4cd964',
