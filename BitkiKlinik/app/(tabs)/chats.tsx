@@ -8,7 +8,8 @@ import {
   ActivityIndicator,
   RefreshControl,
   Image,
-  Dimensions
+  Dimensions,
+  Alert
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
@@ -86,6 +87,30 @@ export default function ChatsScreen() {
       setIsLoading(false);
       setIsRefreshing(false);
     }
+  };
+
+  const handleDeleteSession = async (sessionId: string) => {
+    try {
+      setIsLoading(true);
+      await dotnetClient.delete(`/Chat/session/${sessionId}`);
+      await fetchSessions(false);
+      Alert.alert('Başarılı', 'Sohbet geçmişi başarıyla silindi.');
+    } catch (err: any) {
+      console.error('Failed to delete chat session:', err);
+      Alert.alert('Hata', 'Sohbet silinirken bir sorun oluştu. Lütfen tekrar deneyin.');
+      setIsLoading(false);
+    }
+  };
+
+  const confirmDeleteSession = (sessionId: string) => {
+    Alert.alert(
+      'Sohbeti Sil',
+      'Bu sohbet geçmişini silmek istediğinize emin misiniz? Bu işlem geri alınamaz.',
+      [
+        { text: 'Vazgeç', style: 'cancel' },
+        { text: 'Evet, Sil', style: 'destructive', onPress: () => handleDeleteSession(sessionId) }
+      ]
+    );
   };
 
   // Tab her odaklandığında listeyi güncelle (Canlı güncel veri için)
@@ -177,8 +202,17 @@ export default function ChatsScreen() {
           </Text>
         </View>
 
-        {/* Sağ İkon */}
-        <Ionicons name="chevron-forward" size={20} color={COLORS.slateLight} style={{ marginLeft: 4 }} />
+        {/* Sağ İkonlar */}
+        <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+          <TouchableOpacity 
+            onPress={() => confirmDeleteSession(item.sessionId)}
+            style={{ padding: 8, marginRight: 4 }}
+            activeOpacity={0.6}
+          >
+            <Ionicons name="trash-outline" size={20} color={COLORS.danger} />
+          </TouchableOpacity>
+          <Ionicons name="chevron-forward" size={20} color={COLORS.slateLight} />
+        </View>
       </TouchableOpacity>
     );
   };

@@ -53,11 +53,15 @@ interface Message {
   timestamp: Date;
 }
 
-// Markdown formatındaki (**kalın** ve *italik*) metinleri React Native Text bileşenlerine dönüştürür
+// Markdown formatındaki (**kalın** ve *italik*) metinleri React Native Text bileşenlerine dönüştürür.
+// Ayrıca başlık işaretlerini (###) temizler.
 const renderFormattedText = (text: string) => {
   if (!text) return null;
   
-  const parts = text.split('**');
+  // Başlık işaretlerini (###) ve sonrasındaki boşluğu temizle
+  const cleanText = text.replace(/###\s?/g, '');
+  
+  const parts = cleanText.split('**');
   return parts.map((part, i) => {
     const isBold = i % 2 === 1;
     

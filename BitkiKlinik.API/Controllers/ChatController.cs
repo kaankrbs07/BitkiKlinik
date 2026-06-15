@@ -369,6 +369,46 @@ public class ChatController : ControllerBase
         }
     }
 
+    /// <summary>
+    /// Belirtilen sohbet oturumuna ait tüm mesajları pasife çeker (soft delete / IsActive = false).
+    /// </summary>
+    [HttpDelete("session/{sessionId}")]
+    public async Task<IActionResult> DeleteChatSession(string sessionId)
+    {
+        if (string.IsNullOrEmpty(sessionId))
+            return BadRequest(new { Message = "Geçersiz oturum kimliği." });
+
+        try
+        {
+            var userId = GetCurrentUserId();
+
+            var sessionMessages = await _context.ChatMessages
+                .Where(m => m.UserId == userId && m.SessionId == sessionId)
+                .ToListAsync();
+
+            if (!sessionMessages.Any())
+                return NotFound(new { Message = "Belirtilen oturuma ait aktif sohbet kaydı bulunamadı." });
+
+            foreach (var message in sessionMessages)
+            {
+                message.IsActive = false;
+            }
+
+            _context.ChatMessages.UpdateRange(sessionMessages);
+            await _context.SaveChangesAsync();
+
+            _logger.LogInformation("Sohbet oturumu pasife çekildi (soft delete). UserId: {UserId}, SessionId: {SessionId}, Silinen Mesaj Sayısı: {Count}", 
+                userId, sessionId, sessionMessages.Count);
+
+            return Ok(new { Message = "Sohbet oturumu başarıyla silindi." });
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Sohbet oturumu silinirken hata oluştu. SessionId: {SessionId}", sessionId);
+            return StatusCode(500, new { Message = "Sohbet silinirken sunucu tarafında bir hata oluştu.", Error = ex.Message });
+        }
+    }
+
     // ── Özel Yardımcılar ──────────────────────────────────────────────
 
     private int GetCurrentUserId()

@@ -40,4 +40,9 @@ public class ChatMessage
     /// Mesajın gönderilme tarihi (UTC).
     /// </summary>
     public DateTime CreatedDate { get; set; } = DateTime.UtcNow;
+
+    /// <summary>
+    /// Sohbet mesajının aktif olup olmadığını belirtir (soft delete desteği).
+    /// </summary>
+    public bool IsActive { get; set; } = true;
 }

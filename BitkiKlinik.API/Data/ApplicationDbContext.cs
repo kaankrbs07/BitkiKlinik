@@ -149,6 +149,7 @@ public class ApplicationDbContext : DbContext
             entity.Property(c => c.Role).IsRequired().HasMaxLength(50);
             entity.Property(c => c.Content).IsRequired();
             entity.Property(c => c.SessionId).IsRequired().HasMaxLength(100).HasDefaultValue("");
+            entity.Property(c => c.IsActive).HasDefaultValue(true);
             
             entity.HasOne(c => c.User)
                   .WithMany()
@@ -159,6 +160,8 @@ public class ApplicationDbContext : DbContext
                   .WithMany()
                   .HasForeignKey(c => c.ScanId)
                   .OnDelete(DeleteBehavior.Restrict);
+
+            entity.HasQueryFilter(c => c.IsActive);
         });
 
         // ── DiseaseRiskAlert configuration ───────────────────────────────────
