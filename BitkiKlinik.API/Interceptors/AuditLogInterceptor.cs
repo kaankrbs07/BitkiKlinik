@@ -33,7 +33,8 @@ public sealed class AuditLogInterceptor : SaveChangesInterceptor
     {
         "Users",
         "Diseases",
-        "Treatments"
+        "Treatments",
+        "ChatMessages"
     };
 
     /// <summary>
@@ -113,6 +114,17 @@ public sealed class AuditLogInterceptor : SaveChangesInterceptor
             // Whitelist kontrolü: listedeki tablolar dışındakiler atlanır
             if (!_auditedEntities.Contains(tableName))
                 continue;
+
+            // Özel durum: ChatMessage tablosu için sadece yeni sohbet başlatma (ilk mesaj) loglansın,
+            // sonraki normal mesaj yazmaları loglanmasın.
+            if (entry.Entity is ChatMessage chatMessage && entry.State == EntityState.Added)
+            {
+                var isNewSession = !context.Set<ChatMessage>().Any(m => m.SessionId == chatMessage.SessionId);
+                if (!isNewSession)
+                {
+                    continue;
+                }
+            }
 
             var entityId = GetEntityId(entry);
             var action   = DetermineAction(entry);
