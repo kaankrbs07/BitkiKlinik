@@ -18,6 +18,14 @@ namespace BitkiKlinik.API.Services.Implementations;
 /// </summary>
 public class GeminiService : IGeminiService
 {
+    private static readonly System.Collections.Concurrent.ConcurrentDictionary<string, DateTime> _unhealthyModels = new();
+    private static readonly TimeSpan _cooldownDuration = TimeSpan.FromMinutes(2);
+
+    public static void ClearUnhealthyModelsForTesting()
+    {
+        _unhealthyModels.Clear();
+    }
+
     private readonly IHttpClientFactory _httpClientFactory;
     private readonly ILogger<GeminiService> _logger;
     private readonly string _apiKey;
@@ -92,9 +100,21 @@ public class GeminiService : IGeminiService
         }
         modelsToTry.AddRange(preferredOrder);
 
+        // Sağlıklı (soğuma süresinde olmayan) modelleri filtrele
+        var now = DateTime.UtcNow;
+        var healthyModels = modelsToTry
+            .Where(m => !_unhealthyModels.TryGetValue(m, out var cooldownUntil) || now > cooldownUntil)
+            .ToList();
+
+        // Eğer tüm modeller sağlıksız durumdaysa, tamamını denemeye devam et (fail-open)
+        if (!healthyModels.Any())
+        {
+            healthyModels = modelsToTry;
+        }
+
         for (int attempt = 1; attempt <= maxRetries; attempt++)
         {
-            string activeModel = modelsToTry[Math.Min(attempt - 1, modelsToTry.Count - 1)];
+            string activeModel = healthyModels[Math.Min(attempt - 1, healthyModels.Count - 1)];
             bool shouldDelay = true;
 
             try
@@ -111,6 +131,9 @@ public class GeminiService : IGeminiService
 
                 if (response.IsSuccessStatusCode)
                 {
+                    // Başarılı istekte modelin varsa sağlıksız durumunu kaldır
+                    _unhealthyModels.TryRemove(activeModel, out _);
+
                     var responseJson = await response.Content.ReadAsStringAsync();
                     var geminiResponse = JsonSerializer.Deserialize<GeminiResponse>(responseJson, jsonOptions);
                     var reply = geminiResponse?.Candidates?.FirstOrDefault()?.Content?.Parts?.FirstOrDefault()?.Text;
@@ -129,6 +152,9 @@ public class GeminiService : IGeminiService
                 _logger.LogWarning("Gemini API hata döndürdü. Kod: {StatusCode}, Model: {Model}, Detay: {Detail}. Deneme: {Attempt}/{MaxRetries}", 
                     response.StatusCode, activeModel, errorContent, attempt, maxRetries);
 
+                // Hata veren modeli sağlıksız olarak işaretle
+                _unhealthyModels[activeModel] = DateTime.UtcNow.Add(_cooldownDuration);
+
                 // 400, 401, 403, 404 gibi istemci hatalarında beklemeye gerek yok
                 if (response.StatusCode == System.Net.HttpStatusCode.BadRequest ||
                     response.StatusCode == System.Net.HttpStatusCode.Unauthorized ||
@@ -143,8 +169,16 @@ public class GeminiService : IGeminiService
                     throw new HttpRequestException($"Yapay zeka servisi yoğunluk/hata nedeniyle yanıt veremiyor. Son denenen model: {activeModel}, Hata kodu: {response.StatusCode}");
                 }
             }
-            catch (Exception ex) when (attempt < maxRetries)
+            catch (Exception ex)
             {
+                // Yakalanan tüm hatalarda modeli sağlıksız olarak işaretle
+                _unhealthyModels[activeModel] = DateTime.UtcNow.Add(_cooldownDuration);
+
+                if (attempt == maxRetries)
+                {
+                    throw; // Son denemede hatayı fırlat
+                }
+
                 _logger.LogWarning(ex, "Gemini API çağrısı sırasında hata oluştu. Bir sonraki model denenecek.");
             }
 
